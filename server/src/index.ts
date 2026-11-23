@@ -61,7 +61,7 @@ export default {
 }
 
 type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -91,7 +91,7 @@ export class DuelRoom {
       const slot = (this.players.size + 1) as 1 | 2
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
+      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
       server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
       this.updatePhase()
@@ -206,6 +206,7 @@ export class DuelRoom {
             const targetAttachment = target.socket.deserializeAttachment() as Record<string, unknown> | null
             target.socket.serializeAttachment({ ...(targetAttachment ?? {}), health: target.health })
             target.socket.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
+            if (target.health === 0) this.finishRound(player)
           }
         }
         socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: damage > 0 && target ? target.id : null, hitZone, damage, targetHealth: damage > 0 && target ? target.health : null, accepted: true }))
@@ -241,7 +242,7 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number; roundWins?: number } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
@@ -254,12 +255,44 @@ export class DuelRoom {
         yaw: attachment.yaw ?? Math.PI,
         pitch: attachment.pitch ?? 0,
         health: attachment.health ?? 100,
+        roundWins: attachment.roundWins ?? 0,
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
         lastInputSeq: attachment.lastInputSeq ?? 0,
       })
     }
     this.updatePhase()
+  }
+
+
+  private finishRound(winner: Player): void {
+    if (this.phase !== "fighting") return
+    winner.roundWins += 1
+    for (const player of this.players.values()) {
+      const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
+      player.socket.serializeAttachment({ ...(attachment ?? {}), health: player.health, roundWins: player.roundWins })
+    }
+    const score = {
+      player1: [...this.players.values()].find(p => p.slot === 1)?.roundWins ?? 0,
+      player2: [...this.players.values()].find(p => p.slot === 2)?.roundWins ?? 0,
+    }
+    if (winner.roundWins >= 3) {
+      this.phase = "finished"
+      this.broadcast({ type: "match_ended", winnerPlayerId: winner.id, score })
+      this.broadcastRoomState()
+      return
+    }
+    this.broadcast({ type: "round_ended", roundNumber: score.player1 + score.player2 + 1, winnerPlayerId: winner.id, score })
+    for (const player of this.players.values()) {
+      player.health = 100
+      player.x = 0
+      player.z = 2.3
+      player.yaw = Math.PI
+      player.pitch = 0
+      player.shotTimes = {}
+      const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
+      player.socket.serializeAttachment({ ...(attachment ?? {}), health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {} })
+    }
   }
 
   private updatePhase(): void {
