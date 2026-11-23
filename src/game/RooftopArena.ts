@@ -62,9 +62,6 @@ export class RooftopArena {
   private enemyAimBreakTimer = 0
   private enemyAimBreakCooldown = 0
   private enemyAimBreakDirection = 1
-  private enemyRetreatTimer = 0
-  private enemyRetreatDirection = 1
-  private enemyRetreatUsed = false
   private playerCampTimer = 0
   private enemyFlankTimer = 0
   private enemyFlankCooldown = 0
@@ -279,7 +276,6 @@ export class RooftopArena {
     this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
     this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
     this.playerAimTimer = 0; this.enemyAimBreakTimer = 0; this.enemyAimBreakCooldown = 0; this.enemyAimBreakDirection = 1
-    this.enemyRetreatTimer = 0; this.enemyRetreatDirection = 1; this.enemyRetreatUsed = false
     this.playerCampTimer = 0; this.enemyFlankTimer = 0; this.enemyFlankCooldown = 0
     this.previousPlayerPosition.set(0, 0, 2.3); this.playerVelocity.set(0, 0, 0)
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
@@ -555,15 +551,6 @@ export class RooftopArena {
       }
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
       this.enemyDodgeTimer = Math.max(0, this.enemyDodgeTimer - dt)
-      this.enemyRetreatTimer = Math.max(0, this.enemyRetreatTimer - dt)
-      // A critically wounded rival breaks contact once per round to reach a safer firing lane.
-      if (this.enemyHealth > 0 && this.enemyHealth <= 30 && !this.enemyRetreatUsed) {
-        this.enemyRetreatUsed = true
-        this.enemyRetreatTimer = 2.35
-        this.enemyRetreatDirection = this.enemy.position.x >= this.player.position.x ? 1 : -1
-        this.enemyCovering = false; this.enemyPeeking = false; this.enemyPeekTimer = 0
-        this.enemyShotWindup = 0
-      }
       if (this.enemyCovering) {
         this.enemyPeekTimer += dt
         const peekCycle = this.weapon === 'sniper' ? 2.2 : 2.55
@@ -584,17 +571,15 @@ export class RooftopArena {
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyDodgeTimer > 0
         ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyDodgeDirection * 2.35, -4.1, 4.1)
-        : this.enemyRetreatTimer > 0
-          ? this.enemyRetreatDirection * 5.0
-          : this.enemyAimBreakTimer > 0
-            ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyAimBreakDirection * 2.7, -5.2, 5.2)
+        : this.enemyAimBreakTimer > 0
+          ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyAimBreakDirection * 2.7, -5.2, 5.2)
         : this.enemyFlankTimer > 0
           ? this.enemyFlankSide * 5.25
           : this.enemyCovering
             ? (this.enemyPeeking ? 5.65 : 4.2)
             : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       // Keep distance from close-range shotguns; pressure sniper users with faster rotations.
-      const enemyTargetZ = this.enemyRetreatTimer > 0 ? -4.65 : this.enemyCovering ? (rivalStyle === 1 ? -4.15 : -3.35) : this.weapon === 'shotgun' ? -4.1 : rivalStyle === 0 ? -.9 : rivalStyle === 2 ? -2.1 : -1.7
+      const enemyTargetZ = this.enemyCovering ? (rivalStyle === 1 ? -4.15 : -3.35) : this.weapon === 'shotgun' ? -4.1 : rivalStyle === 0 ? -.9 : rivalStyle === 2 ? -2.1 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
