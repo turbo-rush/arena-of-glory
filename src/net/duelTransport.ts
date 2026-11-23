@@ -129,6 +129,9 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
 export class DuelWebSocketTransport {
   private socket: WebSocket | null = null
   private state: DuelConnectionState = 'disconnected'
+  private heartbeatTimer: number | null = null
+  private lastPongAt = 0
+  private lastRoundTripMs: number | null = null
   private messageListeners = new Set<Listener<ServerDuelMessage>>()
   private stateListeners = new Set<Listener<DuelConnectionState>>()
 
@@ -138,6 +141,10 @@ export class DuelWebSocketTransport {
 
   get connectionState(): DuelConnectionState {
     return this.state
+  }
+
+  get roundTripMs(): number | null {
+    return this.lastRoundTripMs
   }
 
   onMessage(listener: Listener<ServerDuelMessage>): () => void {
@@ -163,27 +170,42 @@ export class DuelWebSocketTransport {
 
       socket.addEventListener('open', () => {
         settled = true
+        this.lastPongAt = Date.now()
+        this.lastRoundTripMs = null
         this.setState('connected')
+        this.startHeartbeat(socket)
         resolve()
       }, { once: true })
 
       socket.addEventListener('message', event => {
         if (typeof event.data !== 'string') return
         const message = parseServerDuelMessage(event.data)
-        if (message) this.messageListeners.forEach(listener => listener(message))
+        if (!message) return
+        if (message.type === 'pong') {
+          this.lastPongAt = Date.now()
+          this.lastRoundTripMs = Math.max(0, this.lastPongAt - message.clientTime)
+        }
+        this.messageListeners.forEach(listener => listener(message))
       })
 
       socket.addEventListener('error', () => {
         if (!settled) {
           settled = true
-          this.setState('disconnected')
+          if (this.socket === socket) {
+            this.socket = null
+            this.stopHeartbeat()
+            this.setState('disconnected')
+          }
           reject(new Error('Unable to connect to the duel server'))
         }
       })
 
       socket.addEventListener('close', () => {
-        if (this.socket === socket) this.socket = null
-        this.setState('disconnected')
+        if (this.socket === socket) {
+          this.socket = null
+          this.stopHeartbeat()
+          this.setState('disconnected')
+        }
         if (!settled) {
           settled = true
           reject(new Error('Duel server closed the connection'))
@@ -202,8 +224,32 @@ export class DuelWebSocketTransport {
   close(): void {
     const socket = this.socket
     this.socket = null
+    this.stopHeartbeat()
     if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'client_leave')
     this.setState('disconnected')
+  }
+
+  private startHeartbeat(socket: WebSocket): void {
+    this.stopHeartbeat()
+    this.heartbeatTimer = window.setInterval(() => {
+      if (this.socket !== socket || socket.readyState !== WebSocket.OPEN) return
+      if (Date.now() - this.lastPongAt > 15_000) {
+        socket.close(4000, 'heartbeat_timeout')
+        return
+      }
+      try {
+        socket.send(JSON.stringify({ type: 'ping', clientTime: Date.now() } satisfies ClientDuelMessage))
+      } catch {
+        socket.close(4001, 'heartbeat_send_failed')
+      }
+    }, 5_000)
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer !== null) {
+      window.clearInterval(this.heartbeatTimer)
+      this.heartbeatTimer = null
+    }
   }
 
   private setState(next: DuelConnectionState): void {
