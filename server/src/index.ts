@@ -194,7 +194,7 @@ export class DuelRoom {
         const typedWeapon = weapon as WeaponId
         const now = Date.now()
         const lastShotAt = player.shotTimes[typedWeapon] ?? 0
-        if (now - lastShotAt < cooldowns[typedWeapon]) {
+        if (player.weapon !== typedWeapon || now < player.reloadUntil || player.ammo[typedWeapon] <= 0 || now - lastShotAt < cooldowns[typedWeapon]) {
           socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: null, hitZone: null, damage: 0, targetHealth: null, accepted: false }))
           break
         }
