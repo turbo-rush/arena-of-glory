@@ -58,7 +58,7 @@ export default function App() {
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
       } else if (message.type === 'resume_state') {
-        gameRef.current?.applyOnlineResume(message.health)
+        gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins)
       } else if (message.type === 'loadout_update') {
         gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
       } else if (message.type === 'switch_weapon') {
