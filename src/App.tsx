@@ -75,6 +75,12 @@ export default function App() {
     }
   }
 
+  const playSolo = () => {
+    leaveRoom()
+    gameRef.current?.start()
+    setStarted(true)
+  }
+
   const createRoom = async () => {
     try {
       setRoomError('')
@@ -197,7 +203,8 @@ export default function App() {
         <label className="lobby-label">PLAYER NAME</label>
         <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />
         {roomPhase === 'idle' && <>
-          <button className="lobby-primary" onClick={createRoom}>CREATE DUEL ROOM <span>→</span></button>
+          <button className="lobby-primary" onClick={playSolo}>PLAY SOLO <span>→</span></button>
+          <button className="lobby-secondary" style={{ marginTop: 10 }} onClick={createRoom}>CREATE ONLINE DUEL</button>
         </>}
         {roomPhase !== 'idle' && <div className="room-status">
           <div className="room-status-line"><span className={roomPhase === 'connecting' ? 'status-dot connecting' : 'status-dot'} />{roomPhase === 'connecting' ? 'CONNECTING TO DUEL SERVER' : roomPhase === 'fighting' ? 'BOTH PLAYERS READY' : 'ROOM CONNECTED'}</div>
@@ -212,7 +219,7 @@ export default function App() {
           <button className="lobby-secondary" onClick={leaveRoom}>LEAVE ROOM</button>
         </div>}
         {roomError && <div className="lobby-error">{roomError}</div>}
-        <small className="lobby-footnote">ONLINE PVP // PRIVATE ROOM PROTOTYPE</small>
+        <small className="lobby-footnote">SOLO TRAINING // ONLINE PVP</small>
       </div></div>}
       {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => gameRef.current?.continueRound()}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
       <footer className="footer"><span><Shield size={13}/> {roomPhase === 'fighting' ? 'ONLINE DUEL // INPUT RELAY' : 'TRAINING SIMULATION'}</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
