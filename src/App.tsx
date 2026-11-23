@@ -76,7 +76,7 @@ export default function App() {
           )
           onlineModeRef.current = true
         }
-        gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins, message.x, message.z, message.lastInputSeq)
+        gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins, message.x, message.z, message.lastInputSeq, message.opponentHealth)
         if (pendingResumeLoadoutRef.current) {
           const loadout = pendingResumeLoadoutRef.current
           gameRef.current?.applyOnlineLoadout(loadout.weapon, loadout.ammo, loadout.reserveAmmo, loadout.reloading)
