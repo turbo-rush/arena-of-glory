@@ -360,11 +360,12 @@ export class DuelRoom {
   private async restorePendingPlayers(): Promise<void> {
     const pending = await this.state.storage.list<{ expiresAt: number; player: Record<string, any> }>({ prefix: "resume:" })
     for (const [key, saved] of pending) {
+      const data = saved.player
       if (saved.expiresAt <= Date.now()) {
+        if (data?.playerId) this.players.delete(data.playerId)
         await this.state.storage.delete(key)
         continue
       }
-      const data = saved.player
       if (!data?.playerId || this.players.has(data.playerId)) continue
       this.players.set(data.playerId, {
         ...data,
@@ -377,7 +378,9 @@ export class DuelRoom {
         shotTimes: data.shotTimes ?? {},
       } as Player)
     }
-    if (pending.size > 0) {
+    if (this.players.size < 2 && this.phase !== "finished") {
+      this.phase = this.players.size === 0 ? "waiting" : "ready"
+    } else if (pending.size > 0) {
       this.phase = await this.state.storage.get<typeof this.phase>("roomPhase") ?? this.phase
     }
   }
