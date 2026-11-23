@@ -62,6 +62,11 @@ export default function App() {
         gameRef.current?.applyOnlineDamage(message.health, message.damage, message.hitZone)
       } else if (message.type === 'round_ended') {
         gameRef.current?.applyOnlineRoundResult(message.roundNumber, message.winnerPlayerId === myPlayerId)
+        setRoomPhase('ready')
+        setStarted(true)
+      } else if (message.type === 'round_started') {
+        gameRef.current?.startOnlineRound(message.roundNumber)
+        setRoomPhase('fighting')
         setStarted(true)
       } else if (message.type === 'match_ended') {
         gameRef.current?.applyOnlineMatchResult(message.winnerPlayerId === myPlayerId)
@@ -233,7 +238,7 @@ export default function App() {
         {roomError && <div className="lobby-error">{roomError}</div>}
         <small className="lobby-footnote">SOLO TRAINING // ONLINE PVP</small>
       </div></div>}
-      {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => gameRef.current?.continueRound()}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
+      {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => { if (roomCode) { try { transportRef.current?.send({ type: 'continue_round' }) } catch (error) { setRoomError(error instanceof Error ? error.message : 'Could not ready up') } } else gameRef.current?.continueRound() }}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
       <footer className="footer"><span><Shield size={13}/> {roomPhase === 'fighting' ? 'ONLINE DUEL // INPUT RELAY' : 'TRAINING SIMULATION'}</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
     </main>
   )
