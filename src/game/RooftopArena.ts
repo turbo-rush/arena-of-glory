@@ -194,9 +194,9 @@ export class RooftopArena {
     this.box(far, 0, .1, -5.8, 15, 1.3, .5, '#656a72')
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
-    this.player = this.createFighter('#e5a23b', '#263342')
+    this.player = this.createFighter('volt')
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
-    this.enemy = this.createFighter('#d64f48', '#20232d')
+    this.enemy = this.createFighter('vex')
     this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(1.28); far.add(this.enemy)
     this.rebuildWeaponModel()
     // Camera follows just behind the player, looking toward the rival rooftop.
@@ -205,20 +205,108 @@ export class RooftopArena {
     this.applyArena(0)
   }
 
-  private createFighter(jacket: string, pants: string) {
+  private createFighter(character: 'volt' | 'vex') {
     const group = new THREE.Group()
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), this.material(jacket)); torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 8, 7), this.material('#c58f70')); head.position.y = 1.93; head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(.57, .18, .5), this.material(pants)); hood.position.set(0, 2.08, -.03); hood.userData.hitZone = 'head'; group.add(hood)
+    const isVolt = character === 'volt'
+    const jacketColor = isVolt ? '#202936' : '#211d32'
+    const pantsColor = isVolt ? '#293442' : '#252538'
+    const accentColor = isVolt ? '#ff713d' : '#f044a0'
+    const secondaryColor = isVolt ? '#ffd447' : '#a45cff'
+    const skinColor = isVolt ? '#bd8064' : '#d69a83'
+    const cloth = this.material(jacketColor, .9)
+    const pants = this.material(pantsColor, .92)
+    const accent = this.material(accentColor, .62)
+    const secondary = this.material(secondaryColor, .7)
+    const skin = this.material(skinColor, .88)
+    const rubber = this.material('#111722', .96)
+    const metal = this.material('#65717e', .38)
+    const addBox = (parent: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material, rz = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
+      mesh.position.set(x, y, z); mesh.rotation.z = rz; mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh)
+      return mesh
+    }
+    const addSphere = (parent: THREE.Object3D, x: number, y: number, z: number, sx: number, sy: number, sz: number, mat: THREE.Material) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), mat)
+      mesh.position.set(x, y, z); mesh.scale.set(sx, sy, sz); mesh.castShadow = true; parent.add(mesh)
+      return mesh
+    }
+    const addCone = (parent: THREE.Object3D, x: number, y: number, z: number, radius: number, height: number, mat: THREE.Material, rotationX = 0, rotationZ = 0) => {
+      const mesh = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), mat)
+      mesh.position.set(x, y, z); mesh.rotation.set(rotationX, 0, rotationZ); mesh.castShadow = true; parent.add(mesh)
+      return mesh
+    }
+
+    // Shared athletic base silhouette; hit zones stay on the torso and head.
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), cloth)
+    torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
+    const shirt = this.material(isVolt ? '#e8e2d5' : '#d8d0e2', .95)
+    addBox(group, .3, .62, .035, 0, 1.22, .232, shirt)
+    addBox(group, .12, .62, .045, -.22, 1.2, .244, accent, -.08)
+    addBox(group, .12, .62, .045, .22, 1.2, .244, accent, .08)
+    addBox(group, .76, .16, .48, 0, 1.68, 0, cloth)
+    addBox(group, .16, .72, .045, -.31, 1.22, .235, secondary, -.12)
+    addBox(group, .16, .72, .045, .31, 1.22, .235, secondary, .12)
+    addBox(group, .58, .11, .46, 0, .76, 0, rubber)
+    addBox(group, .16, .13, .08, 0, .76, .27, metal)
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 12, 10), skin)
+    head.position.y = 1.93; head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
+    addBox(group, .22, .16, .2, 0, 2.19, -.015, skin)
+    // Face details are deliberately subtle so the silhouette reads at phone scale.
+    addSphere(group, -.095, 1.96, .236, .025, .018, .018, rubber)
+    addSphere(group, .095, 1.96, .236, .025, .018, .018, rubber)
+
+    if (isVolt) {
+      const hair = this.material('#171b24', .78)
+      addSphere(group, 0, 2.13, -.025, .29, .19, .29, hair)
+      addCone(group, -.17, 2.22, .02, .12, .34, hair, 0, -.72)
+      addCone(group, -.02, 2.27, .08, .13, .36, hair, 0, -.18)
+      addCone(group, .13, 2.23, .015, .12, .32, hair, 0, .55)
+      addSphere(group, -.25, 1.98, -.015, .09, .2, .12, hair)
+      // Signature lightning mark on the back panel.
+      addBox(group, .08, .24, .025, .02, 1.24, -.228, accent, .28)
+      addBox(group, .16, .07, .026, .04, 1.15, -.23, accent, -.35)
+    } else {
+      const hair = this.material('#f044a0', .68)
+      const darkHair = this.material('#33203f', .78)
+      addSphere(group, 0, 2.13, -.015, .29, .19, .29, hair)
+      addBox(group, .12, .28, .08, -.2, 2.02, .08, hair, -.22)
+      addBox(group, .12, .24, .08, .2, 2.02, .08, hair, .2)
+      const pony = new THREE.Group(); pony.position.set(.02, 2.13, -.19); group.add(pony)
+      addSphere(pony, .02, .15, -.08, .14, .2, .15, hair)
+      addSphere(pony, .05, .34, -.18, .12, .22, .13, hair)
+      addSphere(pony, .1, .53, -.3, .1, .2, .11, hair)
+      addCone(pony, .12, .68, -.39, .095, .26, hair, -.35, .2)
+      addBox(group, .1, .08, .08, 0, 2.13, -.23, secondary)
+      addBox(group, .055, .2, .03, 0, 1.98, -.23, darkHair, .12)
+      // Magenta back emblem and asymmetric cropped-jacket hem.
+      addBox(group, .24, .08, .025, 0, .88, -.23, accent, -.08)
+      addBox(group, .08, .24, .025, .02, 1.03, -.23, secondary, .25)
+    }
+
     const legs: THREE.Mesh[] = []
     for (const x of [-.2, .2]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), this.material(pants)); leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), pants)
+      leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
+      addBox(leg, .34, .18, .43, 0, -.34, -.075, rubber)
+      addBox(leg, .35, .055, .44, 0, -.27, -.075, accent)
+      addBox(leg, .27, .12, .08, 0, .02, .17, secondary)
     }
+    // Distinctive gloves and forearm guards.
+    const leftArm = new THREE.Group(); leftArm.position.set(-.43, 1.42, -.08); group.add(leftArm)
+    addBox(leftArm, .2, .68, .22, 0, -.3, 0, cloth, .12)
+    addBox(leftArm, .22, .18, .24, 0, -.58, .015, rubber)
+    addBox(leftArm, .23, .12, .24, 0, -.43, .015, accent)
+
     const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
-    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), this.material(jacket)); armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
+    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), cloth)
+    armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
+    addBox(arm, .23, .16, .24, 0, -.56, .02, rubber)
+    addBox(arm, .23, .1, .24, 0, -.43, .02, accent)
     const gun = new THREE.Group(); gun.position.set(.03, -.38, -.48); arm.add(gun)
     group.userData.weaponModel = gun
-    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' }))
+    muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
     group.userData.torso = torso
     group.userData.head = head
