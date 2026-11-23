@@ -27,6 +27,7 @@ export class RooftopArena {
   private networkTimer = 0
   private inputSequence = 0
   private onLocalInput?: (input: DuelInput) => void
+  private onLocalFire?: (weapon: WeaponId) => void
   private remoteCrouched = false
   private keys = new Set<string>()
   private touchKeys = new Set<string>()
@@ -249,9 +250,10 @@ export class RooftopArena {
     }
   }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
-  startOnline(onLocalInput: (input: DuelInput) => void) {
+  startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId) => void) {
     this.onlineMode = true
     this.onLocalInput = onLocalInput
+    this.onLocalFire = onLocalFire
     this.networkTimer = 0
     this.inputSequence = 0
     this.started = true
@@ -262,6 +264,7 @@ export class RooftopArena {
   stopOnline() {
     this.onlineMode = false
     this.onLocalInput = undefined
+    this.onLocalFire = undefined
     this.started = false
   }
   applyRemoteInput(input: DuelInput) {
@@ -366,6 +369,7 @@ export class RooftopArena {
       this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
       this.flash(this.player)
       this.showTracer(false)
+      this.onLocalFire?.(this.weapon)
       this.publish()
       return
     }
