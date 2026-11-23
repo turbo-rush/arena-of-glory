@@ -154,6 +154,7 @@ export class DuelWebSocketTransport {
 
   get connectionState(): DuelConnectionState { return this.state }
   get roundTripMs(): number | null { return this.lastRoundTripMs }
+  get reconnecting(): boolean { return this.shouldReconnect && Date.now() - this.reconnectStartedAt < 60_000 }
 
   onMessage(listener: Listener<ServerDuelMessage>): () => void {
     this.messageListeners.add(listener)
@@ -193,6 +194,7 @@ export class DuelWebSocketTransport {
       socket.addEventListener('open', () => {
         settled = true
         this.reconnectAttempt = 0
+        this.reconnectStartedAt = Date.now()
         this.lastPongAt = Date.now()
         this.lastRoundTripMs = null
         this.setState('connected')
