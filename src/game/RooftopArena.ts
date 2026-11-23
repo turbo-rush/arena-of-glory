@@ -291,7 +291,6 @@ export class RooftopArena {
       this.hitFeedbackTimer = .62
       this.enemyHitTimer = .3
     }
-    if (this.enemyHealth <= 0) this.gameStatus = 'VICTORY'
     this.publish()
   }
   applyOnlineDamage(health: number, damage: number, hitZone: 'head' | 'body') {
@@ -301,7 +300,6 @@ export class RooftopArena {
     this.hitFeedback = hitZone === 'head' ? 'HEADSHOT' : 'HIT'
     this.hitFeedbackId++
     this.hitFeedbackTimer = .62
-    if (this.health <= 0) this.gameStatus = 'DEFEAT'
     this.publish()
   }
   applyOnlineRoundResult(roundNumber: number, won: boolean) {
