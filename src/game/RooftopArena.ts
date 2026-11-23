@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
-export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string }
+export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string; hitFeedback: 'HEADSHOT' | 'HIT' | ''; hitFeedbackId: number; damageFlashId: number }
 type StateListener = (state: GameState) => void
 const WEAPONS: Record<WeaponId, { name: string; subtitle: string; magazine: number; reserve: number; damage: number; headMultiplier: number; spread: number; pellets: number }> = {
   pistol: { name: 'VX-9 SIDEARM', subtitle: 'SEMI-AUTO // 9MM', magazine: 12, reserve: 48, damage: 18, headMultiplier: 2.2, spread: .42, pellets: 1 },
@@ -28,6 +28,10 @@ export class RooftopArena {
   private frame = 0
   private health = 100
   private enemyHealth = 100
+  private hitFeedback: GameState['hitFeedback'] = ''
+  private hitFeedbackId = 0
+  private damageFlashId = 0
+  private hitFeedbackTimer = 0
   private weapon: WeaponId = 'pistol'
   private ammo = WEAPONS.pistol.magazine
   private reserveAmmo = WEAPONS.pistol.reserve
@@ -252,6 +256,7 @@ export class RooftopArena {
   }
   private resetRoundState() {
     this.health = 100; this.enemyHealth = 100
+    this.hitFeedback = ''; this.hitFeedbackTimer = 0
     this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
     this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
     this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.reloadTimer = 0
@@ -329,6 +334,9 @@ export class RooftopArena {
       }
     }
     if (totalDamage > 0) {
+      this.hitFeedback = headHits > 0 ? 'HEADSHOT' : 'HIT'
+      this.hitFeedbackId++
+      this.hitFeedbackTimer = .62
       this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = headHits > 0 ? .48 : .3
       const impact = new THREE.Vector3(); this.enemy.localToWorld(impact.set((Math.random() - .5) * .38, headHits > 0 ? 1.93 : 1.2, 0))
       this.spawnImpact(impact, headHits > 0 ? '#fff0a0' : this.weapon === 'sniper' ? '#9fe8ff' : '#ff9b54', headHits > 0 ? 12 : this.weapon === 'shotgun' ? 12 : 7)
@@ -406,7 +414,7 @@ export class RooftopArena {
     this.publish()
   }
   private publish(status: GameState['status'] = this.gameStatus) {
-    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: this.reloading, status, kills: this.roundsWon, roundsWon: this.roundsWon, roundsLost: this.roundsLost, roundNumber: this.roundNumber, arenaName: ARENAS[this.arenaIndex].name })
+    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: this.reloading, status, kills: this.roundsWon, roundsWon: this.roundsWon, roundsLost: this.roundsLost, roundNumber: this.roundNumber, arenaName: ARENAS[this.arenaIndex].name, hitFeedback: this.hitFeedback, hitFeedbackId: this.hitFeedbackId, damageFlashId: this.damageFlashId })
   }
 
   private resize() {
@@ -418,6 +426,10 @@ export class RooftopArena {
     if (this.disposed) return
     this.frame = requestAnimationFrame(this.animate)
     const dt = Math.min(this.clock.getDelta(), .04)
+    if (this.hitFeedbackTimer > 0) {
+      this.hitFeedbackTimer = Math.max(0, this.hitFeedbackTimer - dt)
+      if (this.hitFeedbackTimer === 0 && this.hitFeedback) { this.hitFeedback = ''; this.publish() }
+    }
     if (this.impactParticles.length) {
       for (let i = this.impactParticles.length - 1; i >= 0; i--) {
         const particle = this.impactParticles[i]
@@ -532,6 +544,7 @@ export class RooftopArena {
           if (!protectedByCover && clearShot && !this.isEnemyProtected()) {
             const baseDamage = this.enemyHealth < 45 ? 11 : 8
             this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 3 : baseDamage))
+            this.damageFlashId++
             this.spawnImpact(playerTarget, '#ff805e', 5)
           }
           if (!this.isEnemyProtected()) this.flash(this.enemy)
