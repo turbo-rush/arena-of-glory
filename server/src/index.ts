@@ -295,8 +295,10 @@ export class DuelRoom {
       this.broadcastRoomState()
       return
     }
+    this.phase = "round_break"
     this.broadcast({ type: "round_ended", roundNumber: score.player1 + score.player2 + 1, winnerPlayerId: winner.id, score })
     for (const player of this.players.values()) {
+      player.ready = false
       player.health = 100
       player.x = 0
       player.z = 2.3
