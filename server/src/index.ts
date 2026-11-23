@@ -13,13 +13,25 @@ function makeRoomCode(): string {
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "content-type",
+    },
   })
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "content-type",
+      "access-control-max-age": "86400",
+    } })
     if (url.pathname === "/api/rooms" && request.method === "POST") {
       let code = ""
       let stub: DurableObjectStub | undefined
@@ -55,6 +67,7 @@ export class DuelRoom {
   constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
 
   async fetch(request: Request): Promise<Response> {
+    this.restorePlayers()
     const url = new URL(request.url)
     if (url.pathname === "/internal/create" && request.method === "POST") {
       if (await this.state.storage.get<boolean>("created")) return json({ error: "exists" }, 409)
@@ -84,6 +97,7 @@ export class DuelRoom {
   }
 
   webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): void {
+    this.restorePlayers()
     if (typeof raw !== "string" || raw.length > 16_384) {
       socket.close(1009, "message_too_large")
       return
@@ -102,6 +116,8 @@ export class DuelRoom {
     switch (message.type) {
       case "set_ready":
         player.ready = message.ready === true
+        const attachment = socket.deserializeAttachment() as { playerId: string; name: string; slot: 1 | 2 }
+        socket.serializeAttachment({ ...attachment, ready: player.ready })
         this.updatePhase()
         this.broadcastRoomState()
         if (this.phase === "fighting" && this.players.size === 2) {
@@ -126,6 +142,7 @@ export class DuelRoom {
   }
 
   webSocketClose(socket: WebSocket): void {
+    this.restorePlayers()
     const attachment = socket.deserializeAttachment() as { playerId?: string } | null
     if (attachment?.playerId) this.players.delete(attachment.playerId)
     if (this.phase !== "finished") this.phase = this.players.size === 0 ? "waiting" : "ready"
@@ -134,6 +151,20 @@ export class DuelRoom {
 
   webSocketError(socket: WebSocket): void {
     this.webSocketClose(socket)
+  }
+
+  private restorePlayers(): void {
+    for (const socket of this.state.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean } | null
+      if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
+      this.players.set(attachment.playerId, {
+        id: attachment.playerId,
+        name: attachment.name ?? "PLAYER",
+        ready: attachment.ready === true,
+        socket,
+      })
+    }
+    this.updatePhase()
   }
 
   private updatePhase(): void {
