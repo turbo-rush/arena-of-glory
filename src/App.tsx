@@ -251,25 +251,25 @@ export default function App() {
       </header>
 
       <section className="hud">
-        <div className="fighter-card">
-          <div className="fighter-label"><span>YOU</span><strong>ROOFTOP GHOST</strong></div>
-          <div className="health-track"><span style={{ width: state.health + '%' }} /></div>
-          <div className="health-meta"><b>{state.health}</b><small>HEALTH</small></div>
+        <div className={`fighter-card player-card${state.health <= 30 ? ' is-critical' : ''}`}>
+          <div className="fighter-card-top"><span className="fighter-avatar volt-avatar">V</span><div className="fighter-label"><span>YOU // VOLT</span><strong>{displayName.trim() || 'PLAYER'}</strong></div><b className="health-value">{state.health}<small>%</small></b></div>
+          <div className="health-track"><span style={{ width: Math.max(0, Math.min(100, state.health)) + '%' }} /></div>
+          <div className="health-caption"><span>VITALITY</span><span>{state.health <= 30 ? 'CRITICAL' : state.health <= 60 ? 'WOUNDED' : 'COMBAT READY'}</span></div>
         </div>
-        <div className="versus">VS</div>
-        <div className="fighter-card enemy-card">
-          <div className="fighter-label"><span>ENEMY</span><strong>IRON JACKAL</strong></div>
-          <div className="health-track"><span style={{ width: state.enemyHealth + '%' }} /></div>
-          <div className="health-meta"><b>{state.enemyHealth}</b><small>HEALTH</small></div>
+        <div className="versus"><span>VS</span></div>
+        <div className={`fighter-card enemy-card${state.enemyHealth <= 30 ? ' is-critical' : ''}`}>
+          <div className="fighter-card-top"><span className="fighter-avatar vex-avatar">X</span><div className="fighter-label"><span>RIVAL // VEX</span><strong>{roomPlayers.find(player => player.playerId !== myPlayerId)?.displayName ?? 'RIVAL'}</strong></div><b className="health-value">{state.enemyHealth}<small>%</small></b></div>
+          <div className="health-track"><span style={{ width: Math.max(0, Math.min(100, state.enemyHealth)) + '%' }} /></div>
+          <div className="health-caption"><span>VITALITY</span><span>{state.enemyHealth <= 30 ? 'CRITICAL' : state.enemyHealth <= 60 ? 'WOUNDED' : 'COMBAT READY'}</span></div>
         </div>
       </section>
 
-      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>{state.arenaName}</b><small>FIRST TO 3 WINS THE MATCH</small></div></div>
+      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>{state.arenaName}</b><small>{roomPhase === 'fighting' ? 'LIVE ONLINE DUEL' : 'FIRST TO 3 WINS THE MATCH'}</small></div></div>
 
       <div className="weapon-panel">
-        <div className="weapon-icon">✦</div>
+        <div className="weapon-icon"><span>✦</span><small>LOADOUT</small></div>
         <div className="weapon-info"><b>{({ pistol: 'VX-9 SIDEARM', rifle: 'AR-4 STRIKER', shotgun: 'BREACH-12', sniper: 'M-90 LONGSHOT' })[state.weapon]}</b><small>{({ pistol: 'SEMI-AUTO // 9MM', rifle: 'FULL-AUTO // 5.56MM', shotgun: 'PUMP ACTION // 12 GA', sniper: 'BOLT ACTION // .308' })[state.weapon]}</small></div>
-        <div className="ammo"><b>{String(state.ammo).padStart(2, '0')}</b><small>/ {String(state.reserveAmmo).padStart(3, '0')}</small></div>
+        <div className={`ammo${state.ammo <= 3 ? ' ammo-low' : ''}`}><b>{String(state.ammo).padStart(2, '0')}</b><small>/ {String(state.reserveAmmo).padStart(3, '0')}</small></div>
         <button className={`reload-btn${state.reloading ? " is-reloading" : ""}`} onClick={reload} aria-label="Перезарядить" disabled={state.reloading}><RotateCcw size={17}/>{state.reloading && <small>RELOAD</small>}</button>
         <button className="weapon-switch" onClick={() => gameRef.current?.switchWeapon()} aria-label="Сменить оружие">SWAP</button>
       </div>
