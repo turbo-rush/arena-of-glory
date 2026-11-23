@@ -52,3 +52,81 @@
 .lobby-error{margin-top:10px;padding:8px 10px;background:#662c2c66;border-left:2px solid #ef665b;color:#ffc1ba;font-size:11px}
 .lobby-footnote{display:block;margin-top:17px;color:#89929e;font-size:8px;letter-spacing:1.7px}
 @media(max-width:600px){.lobby-card{width:92%;max-height:82vh;margin-left:0;justify-self:center;padding:20px}.lobby-card h1{font-size:52px}.lobby-card>p{font-size:12px}.lobby-input{height:36px}.room-code strong{font-size:24px}.start-overlay{background:rgba(5,9,15,.65)}}
+
+
+/* NEON INK HUD refresh — compact identity, vitality and loadout hierarchy. */
+.hud{width:min(720px,92%);gap:12px;top:92px;align-items:stretch}
+.fighter-card{padding:11px 13px 9px;border-color:#ffffff35;box-shadow:0 8px 24px #05080e55;position:relative;overflow:hidden}
+.fighter-card:before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:#ffad48}
+.enemy-card:before{background:#f05a70}
+.fighter-card-top{display:flex;align-items:center;gap:9px;min-width:0}
+.fighter-avatar{display:grid;place-items:center;flex:0 0 30px;height:30px;font:900 19px 'Barlow Condensed';font-style:italic;transform:skew(-7deg);border:1px solid #ffad48;color:#ffca79;background:#24212a}
+.vex-avatar{border-color:#f044a0;color:#ff8bc2;background:#2b1d30}
+.fighter-label{display:flex;flex:1;min-width:0;flex-direction:column;gap:1px}
+.fighter-label span{font-size:8px;letter-spacing:1.6px;color:#ffbd68}
+.enemy-card .fighter-label span{color:#ff85a0}
+.fighter-label strong{font:700 13px 'Barlow Condensed';letter-spacing:1.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.health-value{font:800 23px 'Barlow Condensed';white-space:nowrap}
+.health-value small{font-size:10px;color:#a9b0bb;margin-left:2px}
+.health-track{height:6px;margin:9px 0 5px;background:#343b47}
+.health-track span{background:linear-gradient(90deg,#f28c36,#ffd06b);box-shadow:0 0 10px #f7a84666}
+.enemy-card .health-track span{background:linear-gradient(90deg,#dc4564,#ff9b79);box-shadow:0 0 10px #ef547566}
+.health-caption{display:flex;justify-content:space-between;color:#9ea8b5;font:700 7px 'Rajdhani';letter-spacing:1.5px}
+.fighter-card.is-critical{border-color:#ff5d62;animation:critical-pulse 1s ease-in-out infinite alternate}
+.fighter-card.is-critical .health-track span{background:linear-gradient(90deg,#d9273d,#ff6b5d)}
+@keyframes critical-pulse{to{box-shadow:0 0 18px #f13c4c55}}
+.versus{display:grid;place-items:center;flex:0 0 34px;font:900 18px 'Barlow Condensed';color:#ffbc5c}
+.versus span{padding:5px 3px;border-top:1px solid #ffb34e88;border-bottom:1px solid #ffb34e88}
+.objective{top:42%;padding:11px 15px;background:#0b111bd9;border:1px solid #ffffff24;border-left:3px solid #ffb34e;box-shadow:0 8px 24px #0004}
+.objective b{font:800 12px 'Barlow Condensed';letter-spacing:1.7px}
+.objective small{font-size:9px;letter-spacing:1px;margin-top:2px}
+.weapon-panel{min-height:66px;gap:12px;padding:10px 14px;background:linear-gradient(110deg,#0e1623f2,#151c29ed);border:1px solid #ffbf6b55;box-shadow:0 10px 32px #0006}
+.weapon-icon{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1;color:#ffb34e}
+.weapon-icon span{font-size:24px}
+.weapon-icon small{font:700 6px 'Rajdhani';letter-spacing:1px;color:#8994a3}
+.weapon-info b{font:800 14px 'Barlow Condensed';letter-spacing:1.6px}
+.weapon-info small{font-size:8px;letter-spacing:1.6px;margin-top:2px}
+.ammo{display:flex;align-items:baseline;gap:3px}
+.ammo b{font:800 27px 'Barlow Condensed'}
+.ammo small{font-size:11px}
+.ammo-low b{color:#ff6669;text-shadow:0 0 12px #ff454555}
+.weapon-switch{padding:8px 11px;font-size:10px;box-shadow:2px 2px 0 #7a4825}
+.result-overlay{backdrop-filter:blur(8px);background:radial-gradient(ellipse at center,#192437eF,#070b13f5 72%)}
+.result-overlay .eyebrow{padding:6px 12px;border:1px solid #ffb34e55;background:#ffb34e12}
+.result-overlay h2{font-size:clamp(58px,10vw,100px);letter-spacing:2px;text-shadow:0 0 28px #ffb34e55}
+.result-overlay button{min-width:190px;padding:15px 22px;font-size:16px}
+.footer{z-index:2}
+@media(max-width:600px){
+ .hud{top:78px;width:96%;gap:5px}
+ .fighter-card{padding:7px 7px 6px}
+ .fighter-card-top{gap:5px}
+ .fighter-avatar{flex-basis:23px;height:23px;font-size:15px}
+ .fighter-label span{font-size:6px;letter-spacing:1px}
+ .fighter-label strong{font-size:10px;letter-spacing:.6px}
+ .health-value{font-size:18px}
+ .health-value small{font-size:8px}
+ .health-track{height:5px;margin:6px 0 4px}
+ .health-caption{font-size:6px;letter-spacing:.8px}
+ .versus{flex-basis:22px;font-size:14px}
+ .objective{top:37%;max-width:68%;padding:8px 9px;gap:7px}
+ .objective b{font-size:10px;letter-spacing:1px}
+ .objective small{font-size:8px;letter-spacing:.5px}
+ .weapon-panel{bottom:160px;min-height:62px;gap:7px;padding:7px 8px}
+ .weapon-icon span{font-size:20px}
+ .weapon-icon small{font-size:5px}
+ .weapon-info b{font-size:11px;letter-spacing:1px}
+ .weapon-info small{font-size:7px;letter-spacing:.9px}
+ .ammo{padding-left:7px}
+ .ammo b{font-size:21px}
+ .ammo small{font-size:9px}
+ .reload-btn{padding:3px}
+ .reload-btn svg{width:15px;height:15px}
+ .weapon-switch{padding:6px 7px;font-size:8px}
+ .result-overlay h2{font-size:62px}
+}
+@media(max-height:700px) and (max-width:600px){
+ .hud{top:66px}
+ .objective{top:34%}
+ .weapon-panel{bottom:145px}
+ .touch-controls{bottom:42px}
+}
