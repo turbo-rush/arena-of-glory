@@ -31,6 +31,7 @@ export type ServerDuelMessage =
   | { type: 'welcome'; playerId: string; roomCode: string; slot: 1 | 2 }
   | { type: 'room_state'; phase: DuelPhase; players: { playerId: string; displayName: string; ready: boolean; connected: boolean }[] }
   | { type: 'match_started'; arenaId: string; seed: number; serverTime: number }
+  | { type: 'round_started'; roundNumber: number; serverTime: number }
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
   | { type: 'snapshot'; serverTick: number; ackInputSeq: number; players: { playerId: string; x: number; y: number; z: number; yaw: number; health: number; ammo: number; weapon: WeaponId; alive: boolean }[] }
