@@ -572,7 +572,7 @@ export class RooftopArena {
         }
       }
     }
-    if (!this.started && this.gameStatus === 'ROUND_BREAK') {
+    if (!this.onlineMode && !this.started && this.gameStatus === 'ROUND_BREAK') {
       this.intermissionTimer -= dt
       if (this.intermissionTimer <= 0) this.beginNextRound()
     }
