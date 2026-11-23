@@ -41,13 +41,26 @@ export default function App() {
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' ? 'ready' : 'waiting')
       } else if (message.type === 'match_started') {
         setRoomPhase('fighting')
+        setStarted(true)
+        gameRef.current?.startOnline(
+          input => transport.send({ type: 'input', input }),
+          weapon => transport.send({ type: 'fire', shotId: Date.now(), weapon, aimYaw: 0, aimPitch: 0 })
+        )
+      } else if (message.type === 'input') {
+        gameRef.current?.applyRemoteInput(message.input)
+      } else if (message.type === 'fire') {
+        gameRef.current?.applyRemoteFire()
       } else if (message.type === 'error') {
         setRoomError(message.message)
       }
     })
     transport.onStateChange(connection => {
       if (connection === 'connecting') setRoomPhase('connecting')
-      if (connection === 'disconnected') setRoomPhase('idle')
+      if (connection === 'disconnected') {
+        setRoomPhase('idle')
+        gameRef.current?.stopOnline()
+        setStarted(false)
+      }
     })
     try {
       await transport.connect()
@@ -181,7 +194,7 @@ export default function App() {
         <small className="lobby-footnote">ONLINE PVP // PRIVATE ROOM PROTOTYPE</small>
       </div></div>}
       {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => gameRef.current?.continueRound()}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
-      <footer className="footer"><span><Shield size={13}/> TRAINING SIMULATION</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
+      <footer className="footer"><span><Shield size={13}/> {roomPhase === 'fighting' ? 'ONLINE DUEL // INPUT RELAY' : 'TRAINING SIMULATION'}</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
     </main>
   )
 }
