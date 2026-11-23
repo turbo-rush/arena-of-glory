@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Crosshair, Shield, Zap, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import { RooftopArena, type GameState } from './game/RooftopArena'
+import { createDuelRoom, createDuelTransport, duelRoomWebSocketUrl } from './net/duelRooms'
+import type { DuelWebSocketTransport, ServerDuelMessage } from './net/duelTransport'
 
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null)
@@ -8,6 +10,13 @@ export default function App() {
   const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0, roundsWon: 0, roundsLost: 0, roundNumber: 1, arenaName: 'SKYLINE // GOLDEN HOUR', hitFeedback: '', hitFeedbackId: 0, damageFlashId: 0 })
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
+  const [displayName, setDisplayName] = useState('PLAYER')
+  const [roomCodeInput, setRoomCodeInput] = useState('')
+  const [roomCode, setRoomCode] = useState('')
+  const [roomPhase, setRoomPhase] = useState<'idle' | 'connecting' | 'waiting' | 'ready' | 'fighting'>('idle')
+  const [roomPlayers, setRoomPlayers] = useState<{ playerId: string; displayName: string; ready: boolean; connected: boolean }[]>([])
+  const [roomError, setRoomError] = useState('')
+  const transportRef = useRef<DuelWebSocketTransport | null>(null)
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -15,6 +24,87 @@ export default function App() {
     gameRef.current = game
     return () => { game.destroy(); gameRef.current = null }
   }, [])
+
+  useEffect(() => () => transportRef.current?.close(), [])
+
+  const connectToRoom = async (url: string, code: string) => {
+    transportRef.current?.close()
+    setRoomError('')
+    setRoomCode(code)
+    setRoomPlayers([])
+    setRoomPhase('connecting')
+    const transport = createDuelTransport(url)
+    transportRef.current = transport
+    transport.onMessage((message: ServerDuelMessage) => {
+      if (message.type === 'room_state') {
+        setRoomPlayers(message.players)
+        setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' ? 'ready' : 'waiting')
+      } else if (message.type === 'match_started') {
+        setRoomPhase('fighting')
+      } else if (message.type === 'error') {
+        setRoomError(message.message)
+      }
+    })
+    transport.onStateChange(connection => {
+      if (connection === 'connecting') setRoomPhase('connecting')
+      if (connection === 'disconnected') setRoomPhase('idle')
+    })
+    try {
+      await transport.connect()
+      setRoomPhase('waiting')
+    } catch (error) {
+      setRoomPhase('idle')
+      setRoomError(error instanceof Error ? error.message : 'Unable to connect')
+    }
+  }
+
+  const createRoom = async () => {
+    try {
+      setRoomError('')
+      setRoomPhase('connecting')
+      const room = await createDuelRoom()
+      const url = new URL(room.websocketUrl)
+      url.searchParams.set('name', displayName.trim().slice(0, 20) || 'PLAYER')
+      await connectToRoom(url.toString(), room.roomCode)
+    } catch (error) {
+      setRoomPhase('idle')
+      setRoomError(error instanceof Error ? error.message : 'Could not create room')
+    }
+  }
+
+  const joinRoom = async () => {
+    try {
+      const url = duelRoomWebSocketUrl(roomCodeInput, displayName)
+      await connectToRoom(url, roomCodeInput.trim().toUpperCase())
+    } catch (error) {
+      setRoomError(error instanceof Error ? error.message : 'Could not join room')
+    }
+  }
+
+  const setReady = () => {
+    try {
+      transportRef.current?.send({ type: 'set_ready', ready: true })
+    } catch (error) {
+      setRoomError(error instanceof Error ? error.message : 'Could not set ready')
+    }
+  }
+
+  const leaveRoom = () => {
+    transportRef.current?.close()
+    transportRef.current = null
+    setRoomCode('')
+    setRoomPlayers([])
+    setRoomPhase('idle')
+    setRoomError('')
+  }
+
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode)
+    } catch {
+      setRoomError('Clipboard unavailable. Share the room code manually.')
+    }
+  }
 
   const fire = () => gameRef.current?.shoot()
   const reload = () => gameRef.current?.reload()
@@ -64,7 +154,32 @@ export default function App() {
         <div className="action-buttons"><button className="stance-btn" onClick={() => gameRef.current?.crouch()}><span>↓</span><small>CROUCH</small></button><button className="stance-btn" onClick={() => gameRef.current?.peek(-1)}><span>↶</span><small>PEEK</small></button><button className="aim-btn" onClick={() => gameRef.current?.aim()}><Crosshair size={20}/><small>AIM</small></button><button className="fire-btn" onTouchStart={fire} onMouseDown={fire}><Zap size={25}/><small>FIRE</small></button></div>
       </div>
 
-      {!started && <div className="start-overlay"><div className="start-card"><div className="eyebrow">THE CITY IS YOUR BATTLEFIELD</div><h1>OWN THE<br/><em>ROOFTOPS.</em></h1><p>One opponent. One rooftop. No second chances.</p><button onClick={() => { setStarted(true); gameRef.current?.start() }}>ENTER THE ARENA <span>→</span></button><small>PROTOTYPE BUILD 0.1 // TRAINING MATCH</small></div></div>}
+      {!started && <div className="start-overlay"><div className="lobby-card">
+        <div className="eyebrow">REAL PLAYERS. ONE ROOFTOP.</div>
+        <h1>PRIVATE<br/><em>DUEL.</em></h1>
+        <p>Create a private room and invite a friend, or join with their six-character code.</p>
+        <label className="lobby-label">PLAYER NAME</label>
+        <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />
+        {roomPhase === 'idle' && <>
+          <button className="lobby-primary" onClick={createRoom}>CREATE DUEL ROOM <span>→</span></button>
+          <div className="lobby-divider"><span>OR JOIN A FRIEND</span></div>
+          <div className="lobby-join"><input className="lobby-input code-input" value={roomCodeInput} maxLength={6} onChange={event => setRoomCodeInput(event.target.value.toUpperCase())} placeholder="6-CHARACTER CODE" /><button onClick={joinRoom} disabled={roomCodeInput.trim().length !== 6}>JOIN</button></div>
+        </>}
+        {roomPhase !== 'idle' && <div className="room-status">
+          <div className="room-status-line"><span className={roomPhase === 'connecting' ? 'status-dot connecting' : 'status-dot'} />{roomPhase === 'connecting' ? 'CONNECTING TO DUEL SERVER' : roomPhase === 'fighting' ? 'BOTH PLAYERS READY' : 'ROOM CONNECTED'}</div>
+          <div className="room-code-label">ROOM CODE</div>
+          <div className="room-code"><strong>{roomCode}</strong><button onClick={copyRoomCode}>COPY</button></div>
+          <div className="room-player-list">{[0, 1].map(index => {
+            const player = roomPlayers[index]
+            return <div className="room-player" key={index}><span className="player-slot">{index + 1}</span><div><b>{player?.displayName ?? (index === 0 ? 'WAITING FOR YOU' : 'WAITING FOR OPPONENT')}</b><small>{player ? (player.ready ? 'READY' : 'CONNECTED') : 'NOT CONNECTED'}</small></div><i className={player?.ready ? 'player-ready' : ''}>{player?.ready ? '✓' : '—'}</i></div>
+          })}</div>
+          {roomPhase !== 'fighting' && roomPhase !== 'connecting' && <button className="lobby-primary" onClick={setReady}>I'M READY <span>→</span></button>}
+          <p className="lobby-note">Lobby connection is live. Real-time character movement and combat synchronization are the next development stage.</p>
+          <button className="lobby-secondary" onClick={leaveRoom}>LEAVE ROOM</button>
+        </div>}
+        {roomError && <div className="lobby-error">{roomError}</div>}
+        <small className="lobby-footnote">ONLINE PVP // PRIVATE ROOM PROTOTYPE</small>
+      </div></div>}
       {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => gameRef.current?.continueRound()}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
       <footer className="footer"><span><Shield size={13}/> TRAINING SIMULATION</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
     </main>
