@@ -513,7 +513,9 @@ export class RooftopArena {
       this.enemyFlankCooldown = Math.max(0, this.enemyFlankCooldown - dt)
       if (this.isPlayerProtected() && playerDisplacement < .035) this.playerCampTimer += dt
       else this.playerCampTimer = Math.max(0, this.playerCampTimer - dt * 2.5)
-      const flankThreshold = this.weapon === 'sniper' ? 3.1 : 3.8
+      // Each round introduces a distinct rival doctrine so the duel evolves as the match progresses.
+      const rivalStyle = (this.roundNumber - 1) % 3 // 0: aggressor, 1: sentinel, 2: hunter
+      const flankThreshold = (this.weapon === 'sniper' ? 3.1 : 3.8) * (rivalStyle === 2 ? .72 : rivalStyle === 1 ? 1.3 : 1)
       if (this.playerCampTimer > flankThreshold && this.enemyFlankCooldown <= 0) {
         // Punish prolonged passive cover play by rotating to the opposite rooftop angle.
         this.enemyFlankTimer = 2.9
@@ -524,7 +526,8 @@ export class RooftopArena {
       }
       this.enemyFlankTimer = Math.max(0, this.enemyFlankTimer - dt)
       this.enemyCoverTimer += dt
-      const coverDecisionInterval = this.weapon === 'sniper' ? 2.45 : this.weapon === 'shotgun' ? 3.2 : this.enemyHealth < 60 ? 2.9 : 3.8
+      const baseCoverInterval = this.weapon === 'sniper' ? 2.45 : this.weapon === 'shotgun' ? 3.2 : this.enemyHealth < 60 ? 2.9 : 3.8
+      const coverDecisionInterval = baseCoverInterval * (rivalStyle === 0 ? 1.35 : rivalStyle === 1 ? .62 : .9)
       if (this.enemyCoverTimer > coverDecisionInterval) {
         this.enemyCoverTimer = 0
         // A wounded opponent favors cover; otherwise it alternates between strafing and cover.
@@ -546,8 +549,8 @@ export class RooftopArena {
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       this.enemy.rotation.x = THREE.MathUtils.damp(this.enemy.rotation.x, this.enemyHitTimer > 0 ? -.09 : 0, 10, dt)
       const enemyBaseX = 1.4
-      const strafeSpeed = this.weapon === 'sniper' ? 1.45 : 1.05
-      const strafeWidth = this.weapon === 'sniper' ? 2.45 : this.weapon === 'rifle' ? 2.25 : 2.05
+      const strafeSpeed = (this.weapon === 'sniper' ? 1.45 : 1.05) * (rivalStyle === 0 ? 1.3 : rivalStyle === 1 ? .72 : 1.12)
+      const strafeWidth = (this.weapon === 'sniper' ? 2.45 : this.weapon === 'rifle' ? 2.25 : 2.05) * (rivalStyle === 0 ? 1.18 : rivalStyle === 1 ? .78 : 1.08)
       const enemyStrafe = Math.sin(this.enemyWalkTime * strafeSpeed) * strafeWidth
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyDodgeTimer > 0
@@ -558,7 +561,7 @@ export class RooftopArena {
             ? (this.enemyPeeking ? 5.65 : 4.2)
             : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       // Keep distance from close-range shotguns; pressure sniper users with faster rotations.
-      const enemyTargetZ = this.enemyCovering ? -3.35 : this.weapon === 'shotgun' ? -4.1 : -1.7
+      const enemyTargetZ = this.enemyCovering ? (rivalStyle === 1 ? -4.15 : -3.35) : this.weapon === 'shotgun' ? -4.1 : rivalStyle === 0 ? -.9 : rivalStyle === 2 ? -2.1 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
@@ -613,9 +616,10 @@ export class RooftopArena {
         }
       } else {
         enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
-        if (this.enemyTimer > (this.enemyHealth < 45 ? 1.65 : 2.0) && this.enemyHealth > 0) {
+        const shotInterval = (this.enemyHealth < 45 ? 1.65 : 2.0) * (rivalStyle === 0 ? .78 : rivalStyle === 1 ? 1.28 : .92)
+        if (this.enemyTimer > shotInterval && this.enemyHealth > 0) {
           this.enemyTimer = 0
-          const reactionWindup = this.weapon === 'sniper' ? .27 : .32
+          const reactionWindup = (this.weapon === 'sniper' ? .27 : .32) * (rivalStyle === 0 ? .82 : rivalStyle === 1 ? 1.18 : .92)
           if (Math.random() > .04 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = reactionWindup
         }
       }
