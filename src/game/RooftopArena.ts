@@ -288,6 +288,18 @@ export class RooftopArena {
     const legs = this.enemy.userData.legs as THREE.Mesh[]
     legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
   }
+  applyOnlineLoadout(weapon: WeaponId, ammo: number, reserveAmmo: number, reloading: boolean) {
+    if (!this.onlineMode) return
+    this.weapon = weapon
+    this.ammo = Math.max(0, ammo)
+    this.reserveAmmo = Math.max(0, reserveAmmo)
+    this.ammoByWeapon[weapon] = this.ammo
+    this.reserveByWeapon[weapon] = this.reserveAmmo
+    this.reloading = reloading
+    this.reloadTimer = reloading ? this.reloadDuration : 0
+    this.rebuildWeaponModel()
+    this.publish()
+  }
   applyOnlineShotResult(hit: boolean, damage: number, targetHealth: number | null, hitZone: 'head' | 'body' | null) {
     if (!this.onlineMode) return
     if (targetHealth !== null) this.enemyHealth = targetHealth
