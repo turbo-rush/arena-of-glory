@@ -54,6 +54,8 @@ export default {
       const target = new URL("https://duel.internal/ws")
       target.searchParams.set("roomCode", match[1])
       target.searchParams.set("name", url.searchParams.get("name") ?? "PLAYER")
+      const resumeToken = url.searchParams.get("resumeToken")
+      if (resumeToken) target.searchParams.set("resumeToken", resumeToken)
       return env.DUEL_ROOMS.get(id).fetch(new Request(target.toString(), request))
     }
     return json({ error: "not_found" }, 404)
@@ -64,7 +66,7 @@ type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
 type AmmoState = Record<WeaponId, number>
 const MAGAZINES: AmmoState = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
 const RESERVES: AmmoState = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number; weapon: WeaponId; ammo: AmmoState; reserve: AmmoState; reloadUntil: number }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket | null; resumeToken: string; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number; weapon: WeaponId; ammo: AmmoState; reserve: AmmoState; reloadUntil: number; resumeToken: string }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -86,19 +88,45 @@ export class DuelRoom {
       const created = await this.state.storage.get<boolean>("created")
       if (!created) return json({ error: "room_not_found" }, 404)
       this.roomCode = url.searchParams.get("roomCode") ?? ""
-      if (this.players.size >= 2) return json({ error: "room_full" }, 409)
+      const requestedToken = url.searchParams.get("resumeToken")
+      let resumed: Record<string, any> | null = null
+      if (requestedToken) {
+        const saved = await this.state.storage.get<{ expiresAt: number; player: Record<string, any> }>("resume:" + requestedToken)
+        if (!saved || saved.expiresAt < Date.now()) {
+          await this.state.storage.delete("resume:" + requestedToken)
+          return json({ error: "resume_expired", message: "The reconnect window has expired. Create or join a new room." }, 410)
+        }
+        resumed = saved.player
+        await this.state.storage.delete("resume:" + requestedToken)
+      } else if (this.players.size >= 2) {
+        return json({ error: "room_full" }, 409)
+      }
       const pair = new WebSocketPair()
       const client = pair[0]
       const server = pair[1]
-      const playerId = crypto.randomUUID()
-      const slot = (this.players.size + 1) as 1 | 2
-      const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      const ammo = { ...MAGAZINES }
-      const reserve = { ...RESERVES }
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 })
-      server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 })
-      server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
+      let player: Player
+      if (resumed) {
+        const resumeToken = crypto.randomUUID() + crypto.randomUUID()
+        player = { ...resumed, socket: server, resumeToken } as Player
+        this.players.set(player.id, player)
+        this.phase = await this.state.storage.get<typeof this.phase>("roomPhase") ?? this.phase
+        server.serializeAttachment({ ...resumed, resumeToken })
+        await this.state.storage.setAlarm(Date.now() + 60_000)
+        server.send(JSON.stringify({ type: "welcome", playerId: player.id, roomCode: this.roomCode, slot: player.slot, resumeToken, resumed: true }))
+        this.sendResumeState(server, player)
+      } else {
+        const playerId = crypto.randomUUID()
+        const slot = (this.players.size + 1) as 1 | 2
+        const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
+        const resumeToken = crypto.randomUUID() + crypto.randomUUID()
+        const ammo = { ...MAGAZINES }
+        const reserve = { ...RESERVES }
+        player = { id: playerId, name, ready: false, socket: server, resumeToken, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 }
+        this.players.set(playerId, player)
+        server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0, resumeToken })
+        server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot, resumeToken, resumed: false }))
+      }
       this.updatePhase()
       this.broadcastRoomState()
       return new Response(null, { status: 101, webSocket: client })
@@ -224,8 +252,8 @@ export class DuelRoom {
             damage = hitZone === "head" ? Math.round(baseDamage[typedWeapon] * (typedWeapon === "sniper" ? 2.5 : typedWeapon === "pistol" ? 2.2 : typedWeapon === "rifle" ? 1.8 : 1.25)) : baseDamage[typedWeapon]
             target.health = Math.max(0, target.health - damage)
             const targetAttachment = target.socket.deserializeAttachment() as Record<string, unknown> | null
-            target.socket.serializeAttachment({ ...(targetAttachment ?? {}), health: target.health })
-            target.socket.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
+            if (target.socket) target.socket.serializeAttachment({ ...(targetAttachment ?? {}), health: target.health })
+            target.socket?.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
             if (target.health === 0) this.finishRound(player)
           }
         }
@@ -268,11 +296,47 @@ export class DuelRoom {
     }
   }
 
-  webSocketClose(socket: WebSocket): void {
+  async webSocketClose(socket: WebSocket, code: number, reason: string): Promise<void> {
     this.restorePlayers()
-    const attachment = socket.deserializeAttachment() as { playerId?: string } | null
-    if (attachment?.playerId) this.players.delete(attachment.playerId)
-    if (this.phase !== "finished") this.phase = this.players.size === 0 ? "waiting" : "ready"
+    const attachment = socket.deserializeAttachment() as Record<string, any> | null
+    const player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
+    if (!player || player.socket !== socket) return
+    player.socket = null
+    if (code === 1000 && reason === "player_left") {
+      this.players.delete(player.id)
+      if (this.phase !== "finished") this.phase = this.players.size === 0 ? "waiting" : "ready"
+    } else {
+      const expiresAt = Date.now() + 60_000
+      await this.state.storage.put("resume:" + player.resumeToken, { expiresAt, player: { ...attachment, socket: undefined } })
+      await this.state.storage.put("roomPhase", this.phase)
+      await this.state.storage.setAlarm(expiresAt)
+    }
+    this.broadcastRoomState()
+  }
+
+  async alarm(): Promise<void> {
+    const now = Date.now()
+    for (const [id, player] of this.players) {
+      if (!player.socket) {
+        const saved = await this.state.storage.get<{ expiresAt: number }>("resume:" + player.resumeToken)
+        if (!saved || saved.expiresAt <= now) {
+          await this.state.storage.delete("resume:" + player.resumeToken)
+          this.players.delete(id)
+        }
+      }
+    }
+    if (this.phase !== "finished" && this.players.size < 2) this.phase = this.players.size === 0 ? "waiting" : "ready"
+    this.broadcastRoomState()
+  }
+
+  private sendResumeState(socket: WebSocket, player: Player): void {
+    socket.send(JSON.stringify({ type: "loadout_update", weapon: player.weapon, ammo: player.ammo[player.weapon], reserveAmmo: player.reserve[player.weapon], reloading: Date.now() < player.reloadUntil }))
+    socket.send(JSON.stringify({ type: "resume_state", phase: this.phase, health: player.health, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, roundWins: player.roundWins }))
+    for (const other of this.players.values()) {
+      if (other.id !== player.id && other.socket) {
+        socket.send(JSON.stringify({ type: "input", input: { seq: other.lastInputSeq, clientTime: Date.now(), moveX: other.x, moveZ: other.z, lookYaw: other.yaw, lookPitch: other.pitch, crouched: false, aiming: false } }))
+      }
+    }
     this.broadcastRoomState()
   }
 
@@ -282,13 +346,14 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number; roundWins?: number; weapon?: WeaponId; ammo?: AmmoState; reserve?: AmmoState; reloadUntil?: number } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number; roundWins?: number; weapon?: WeaponId; ammo?: AmmoState; reserve?: AmmoState; reloadUntil?: number; resumeToken?: string } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
         name: attachment.name ?? "PLAYER",
         ready: attachment.ready === true,
         socket,
+        resumeToken: attachment.resumeToken ?? crypto.randomUUID(),
         slot: attachment.slot ?? 1,
         x: attachment.x ?? 0,
         z: attachment.z ?? 2.3,
@@ -313,8 +378,8 @@ export class DuelRoom {
     if (this.phase !== "fighting") return
     winner.roundWins += 1
     for (const player of this.players.values()) {
-      const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
-      player.socket.serializeAttachment({ ...(attachment ?? {}), health: player.health, roundWins: player.roundWins })
+      const attachment = player.socket?.deserializeAttachment() as Record<string, unknown> | null
+      if (player.socket) player.socket.serializeAttachment({ ...(attachment ?? {}), health: player.health, roundWins: player.roundWins })
     }
     const score = {
       player1: [...this.players.values()].find(p => p.slot === 1)?.roundWins ?? 0,
@@ -340,8 +405,8 @@ export class DuelRoom {
       player.ammo = { ...MAGAZINES }
       player.reserve = { ...RESERVES }
       player.reloadUntil = 0
-      const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
-      player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {}, weapon: player.weapon, ammo: player.ammo, reserve: player.reserve, reloadUntil: 0 })
+      const attachment = player.socket?.deserializeAttachment() as Record<string, unknown> | null
+      if (player.socket) player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {}, weapon: player.weapon, ammo: player.ammo, reserve: player.reserve, reloadUntil: 0 })
     }
     this.broadcastRoomState()
   }
@@ -365,8 +430,8 @@ export class DuelRoom {
   private broadcast(message: unknown, except?: WebSocket): void {
     const data = JSON.stringify(message)
     for (const player of this.players.values()) {
-      if (player.socket === except) continue
-      try { player.socket.send(data) } catch { this.players.delete(player.id) }
+      if (!player.socket || player.socket === except) continue
+      try { player.socket.send(data) } catch { player.socket = null }
     }
   }
 }
