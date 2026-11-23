@@ -65,7 +65,7 @@ type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slo
 
 export class DuelRoom {
   private players = new Map<string, Player>()
-  private phase: "waiting" | "ready" | "fighting" | "finished" = "waiting"
+  private phase: "waiting" | "ready" | "fighting" | "round_break" | "finished" = "waiting"
   private roomCode = ""
 
   constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
