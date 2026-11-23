@@ -14,7 +14,7 @@ Cloudflare Worker + Durable Objects room service. The Vite game remains deployed
 - `POST /api/rooms` — creates a six-character private room code and returns `roomCode` and `websocketUrl`.
 - `GET /api/rooms/:code/ws` — upgrades to WebSocket and joins that room.
 
-Players connect, exchange `set_ready`, and the server emits `match_started` when both are ready. During a match, movement and non-fire events are relayed. Fire requests are checked by the server for valid weapon/aim values, unique increasing shot IDs, and per-weapon cooldowns before they are relayed. The shooter receives a `shot_result` acknowledgement; rejected shots are refunded locally.
+Players connect, exchange `set_ready`, and the server emits `match_started` when both are ready. During a match, movement updates are checked for valid rooftop bounds, finite view angles, and strictly increasing input sequence numbers before being relayed with server timestamps. Remote movement is smoothly interpolated on the client. Fire requests are checked by the server for valid weapon/aim values, unique increasing shot IDs, and per-weapon cooldowns before they are relayed. The shooter receives a `shot_result` acknowledgement; rejected shots are refunded locally.
 
 ## Current scope
 
