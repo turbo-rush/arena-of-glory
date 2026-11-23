@@ -18,6 +18,7 @@ export default function App() {
   const [myPlayerId, setMyPlayerId] = useState('')
   const [roomError, setRoomError] = useState('')
   const transportRef = useRef<DuelWebSocketTransport | null>(null)
+  const shotSequenceRef = useRef(0)
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -48,12 +49,14 @@ export default function App() {
         setStarted(true)
         gameRef.current?.startOnline(
           input => transport.send({ type: 'input', input }),
-          weapon => transport.send({ type: 'fire', shotId: Date.now(), weapon, aimYaw: 0, aimPitch: 0 })
+          weapon => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw: 0, aimPitch: 0 })
         )
       } else if (message.type === 'input') {
         gameRef.current?.applyRemoteInput(message.input)
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
+      } else if (message.type === 'shot_result' && !message.accepted) {
+        gameRef.current?.rejectOnlineShot()
       } else if (message.type === 'error') {
         setRoomError(message.message)
       }
