@@ -183,7 +183,6 @@ export class RooftopArena {
     const config = WEAPONS[this.weapon]
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
     let totalDamage = 0
-    let headshot = false
     for (let pellet = 0; pellet < config.pellets; pellet++) {
       const isHead = Math.random() < (this.aiming ? .38 : .16) * (this.weapon === 'sniper' ? 1.45 : 1)
       const target = new THREE.Vector3(); this.enemy.localToWorld(target.set((Math.random() - .5) * config.spread, isHead ? 1.96 : 1.2, 0))
@@ -191,7 +190,6 @@ export class RooftopArena {
       target.y += (Math.random() - .5) * (this.aiming ? .1 : config.spread * .55)
       if (this.hasLineOfSight(origin, target) && !this.isEnemyProtected() && origin.distanceTo(target) > 0) {
         totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
-        if (isHead) headshot = true
       }
     }
     if (totalDamage > 0) { this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = .3 }
