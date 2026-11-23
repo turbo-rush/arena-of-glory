@@ -252,7 +252,7 @@ export class RooftopArena {
     }
   }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
-  startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId) => void) {
+  startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void) {
     this.onlineMode = true
     this.onLocalInput = onLocalInput
     this.onLocalFire = onLocalFire
@@ -280,6 +280,28 @@ export class RooftopArena {
     this.remoteTargetYaw = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
     const legs = this.enemy.userData.legs as THREE.Mesh[]
     legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
+  }
+  applyOnlineShotResult(hit: boolean, damage: number, targetHealth: number | null, hitZone: 'head' | 'body' | null) {
+    if (!this.onlineMode) return
+    if (targetHealth !== null) this.enemyHealth = targetHealth
+    if (hit && damage > 0) {
+      this.hitFeedback = hitZone === 'head' ? 'HEADSHOT' : 'HIT'
+      this.hitFeedbackId++
+      this.hitFeedbackTimer = .62
+      this.enemyHitTimer = .3
+    }
+    if (this.enemyHealth <= 0) this.gameStatus = 'VICTORY'
+    this.publish()
+  }
+  applyOnlineDamage(health: number, damage: number, hitZone: 'head' | 'body') {
+    if (!this.onlineMode) return
+    this.health = THREE.MathUtils.clamp(health, 0, 100)
+    this.damageFlashId++
+    this.hitFeedback = hitZone === 'head' ? 'HEADSHOT' : 'HIT'
+    this.hitFeedbackId++
+    this.hitFeedbackTimer = .62
+    if (this.health <= 0) this.gameStatus = 'DEFEAT'
+    this.publish()
   }
   rejectOnlineShot() {
     if (!this.onlineMode) return
@@ -379,7 +401,10 @@ export class RooftopArena {
       this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
       this.flash(this.player)
       this.showTracer(false)
-      this.onLocalFire?.(this.weapon)
+      const aimDirection = this.camera.getWorldDirection(new THREE.Vector3()).normalize()
+      const aimYaw = Math.atan2(aimDirection.x, aimDirection.z)
+      const aimPitch = Math.asin(THREE.MathUtils.clamp(aimDirection.y, -1, 1))
+      this.onLocalFire?.(this.weapon, aimYaw, aimPitch)
       this.publish()
       return
     }
