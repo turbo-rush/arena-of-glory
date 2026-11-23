@@ -26,6 +26,11 @@ export class RooftopArena {
   private weapon: WeaponId = 'pistol'
   private ammo = WEAPONS.pistol.magazine
   private reserveAmmo = WEAPONS.pistol.reserve
+  private ammoByWeapon: Record<WeaponId, number> = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
+  private reserveByWeapon: Record<WeaponId, number> = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
+  private reloading = false
+  private reloadTimer = 0
+  private reloadDuration = 1.15
   private enemyTimer = 0
   private started = false
   private disposed = false
@@ -119,6 +124,7 @@ export class RooftopArena {
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('#d64f48', '#20232d')
     this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(1.28); far.add(this.enemy)
+    this.rebuildWeaponModel()
     // Camera follows just behind the player, looking toward the rival rooftop.
     this.camera.position.set(0, 7.4, 20.2)
     this.camera.lookAt(0, 1.3, -9.4)
@@ -135,7 +141,8 @@ export class RooftopArena {
     }
     const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
     const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), this.material(jacket)); armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, .72), this.material('#20242b', .4)); gun.position.set(.03, -.38, -.48); arm.add(gun)
+    const gun = new THREE.Group(); gun.position.set(.03, -.38, -.48); arm.add(gun)
+    group.userData.weaponModel = gun
     const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
     group.userData.torso = torso
@@ -145,6 +152,36 @@ export class RooftopArena {
     return group
   }
 
+  private rebuildWeaponModel() {
+    const model = this.player.userData.weaponModel as THREE.Group
+    model.clear()
+    const dark = this.material('#20242b', .38)
+    const metal = this.material('#59616c', .34)
+    const addPart = (w: number, h: number, d: number, x: number, y: number, z: number, material = dark) => {
+      const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
+      part.position.set(x, y, z); part.castShadow = true; model.add(part)
+    }
+    if (this.weapon === 'pistol') {
+      addPart(.16, .17, .48, 0, 0, -.08)
+      addPart(.13, .25, .15, 0, -.17, .02)
+      addPart(.08, .08, .12, 0, .08, -.34, metal)
+    } else if (this.weapon === 'rifle') {
+      addPart(.17, .2, .82, 0, 0, -.2)
+      addPart(.12, .12, .62, 0, .03, -.69, metal)
+      addPart(.15, .3, .22, 0, -.2, -.08)
+      addPart(.18, .16, .3, 0, -.02, .31)
+    } else if (this.weapon === 'shotgun') {
+      addPart(.2, .22, .72, 0, 0, -.18)
+      addPart(.09, .09, .72, 0, .04, -.68, metal)
+      addPart(.16, .13, .3, 0, -.1, .28)
+      addPart(.17, .1, .26, 0, -.12, -.38)
+    } else {
+      addPart(.19, .2, .78, 0, 0, -.22)
+      addPart(.075, .075, 1.0, 0, .07, -.86, metal)
+      addPart(.2, .24, .28, 0, .19, -.32)
+      addPart(.18, .14, .38, 0, -.04, .35)
+    }
+  }
   start() { this.started = true }
   crouch() { this.crouched = !this.crouched }
   peek(direction: -1 | 1) { this.peekDirection = this.peekDirection === direction ? 0 : direction }
@@ -178,7 +215,7 @@ export class RooftopArena {
     })
   }
   shoot() {
-    if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
+    if (!this.started || this.reloading || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
     const config = WEAPONS[this.weapon]
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
@@ -220,24 +257,29 @@ export class RooftopArena {
     }, 110)
   }
   switchWeapon() {
+    if (this.reloading) return
+    this.ammoByWeapon[this.weapon] = this.ammo
+    this.reserveByWeapon[this.weapon] = this.reserveAmmo
     const index = WEAPON_ORDER.indexOf(this.weapon)
     this.weapon = WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length]
-    const config = WEAPONS[this.weapon]
-    this.ammo = config.magazine
-    this.reserveAmmo = config.reserve
+    this.ammo = this.ammoByWeapon[this.weapon]
+    this.reserveAmmo = this.reserveByWeapon[this.weapon]
+    this.rebuildWeaponModel()
     this.publish()
   }
   reload() {
     const config = WEAPONS[this.weapon]
-    if (this.ammo === config.magazine || this.reserveAmmo <= 0 || !this.started) return
-    const needed = config.magazine - this.ammo
-    const loaded = Math.min(needed, this.reserveAmmo)
-    this.ammo += loaded; this.reserveAmmo -= loaded; this.publish()
+    if (this.reloading || this.ammo === config.magazine || this.reserveAmmo <= 0 || !this.started) return
+    this.reloading = true
+    this.reloadTimer = this.reloadDuration
+    const arm = this.player.userData.arm as THREE.Group
+    arm.rotation.x = 1.05
+    this.publish()
   }
-  reset() { this.health = 100; this.enemyHealth = 100; this.weapon = 'pistol'; this.ammo = WEAPONS.pistol.magazine; this.reserveAmmo = WEAPONS.pistol.reserve; this.started = true; this.publish() }
+  reset() { this.health = 100; this.enemyHealth = 100; this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }; this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }; this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.rebuildWeaponModel(); this.started = true; this.publish() }
   private finish(status: 'VICTORY' | 'DEFEAT') { this.started = false; this.publish(status) }
   private publish(status: GameState['status'] = 'FIGHT') {
-    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: false, status, kills: status === 'VICTORY' ? 1 : 0 })
+    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: this.reloading, status, kills: status === 'VICTORY' ? 1 : 0 })
   }
 
   private resize() {
@@ -250,6 +292,21 @@ export class RooftopArena {
     this.frame = requestAnimationFrame(this.animate)
     const dt = Math.min(this.clock.getDelta(), .04)
     if (this.started) {
+      if (this.reloading) {
+        this.reloadTimer -= dt
+        const arm = this.player.userData.arm as THREE.Group
+        arm.rotation.x = THREE.MathUtils.damp(arm.rotation.x, .95, 8, dt)
+        if (this.reloadTimer <= 0) {
+          const config = WEAPONS[this.weapon]
+          const loaded = Math.min(config.magazine - this.ammo, this.reserveAmmo)
+          this.ammo += loaded; this.reserveAmmo -= loaded
+          this.reloading = false
+          arm.rotation.x = 0
+          this.ammoByWeapon[this.weapon] = this.ammo
+          this.reserveByWeapon[this.weapon] = this.reserveAmmo
+          this.publish()
+        }
+      }
       const speed = 4.4 * dt
       const forward = this.keys.has('KeyW') || this.touchKeys.has('KeyW')
       const back = this.keys.has('KeyS') || this.touchKeys.has('KeyS')
