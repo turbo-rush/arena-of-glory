@@ -336,8 +336,12 @@ export class DuelRoom {
       player.yaw = Math.PI
       player.pitch = 0
       player.shotTimes = {}
+      player.weapon = "pistol"
+      player.ammo = { ...MAGAZINES }
+      player.reserve = { ...RESERVES }
+      player.reloadUntil = 0
       const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
-      player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {} })
+      player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {}, weapon: player.weapon, ammo: player.ammo, reserve: player.reserve, reloadUntil: 0 })
     }
     this.broadcastRoomState()
   }
