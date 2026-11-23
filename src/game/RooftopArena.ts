@@ -300,7 +300,7 @@ export class RooftopArena {
     this.health = THREE.MathUtils.clamp(health, 0, 100)
     this.roundsWon = Math.max(0, roundsWon)
     this.roundsLost = Math.max(0, roundsLost)
-    this.roundNumber = this.roundsWon + this.roundsLost + 1
+    this.roundNumber = Math.min(5, this.roundsWon + this.roundsLost + 1)
     if (phase === 'round_break') {
       this.started = false
       this.gameStatus = 'ROUND_BREAK'
