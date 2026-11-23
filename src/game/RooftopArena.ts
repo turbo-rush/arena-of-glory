@@ -274,6 +274,8 @@ export class RooftopArena {
     this.onlineMode = false
     this.onLocalInput = undefined
     this.onLocalFire = undefined
+    this.onLocalReload = undefined
+    this.onLocalSwitchWeapon = undefined
     this.started = false
   }
   applyRemoteInput(input: DuelInput) {
