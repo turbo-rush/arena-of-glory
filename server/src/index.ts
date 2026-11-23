@@ -118,16 +118,18 @@ export class DuelRoom {
     if (!player) return
 
     switch (message.type) {
-      case "set_ready":
+      case "set_ready": {
+        const wasFighting = this.phase === "fighting"
         player.ready = message.ready === true
         const attachment = socket.deserializeAttachment() as { playerId: string; name: string; slot: 1 | 2 }
         socket.serializeAttachment({ ...attachment, ready: player.ready })
         this.updatePhase()
         this.broadcastRoomState()
-        if (this.phase === "fighting" && this.players.size === 2) {
+        if (!wasFighting && this.phase === "fighting" && this.players.size === 2) {
           this.broadcast({ type: "match_started", arenaId: "skyline-golden-hour", seed: crypto.getRandomValues(new Uint32Array(1))[0], serverTime: Date.now() })
         }
         break
+      }
       case "input":
       case "fire":
       case "reload":
