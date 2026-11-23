@@ -66,7 +66,7 @@ type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
 type AmmoState = Record<WeaponId, number>
 const MAGAZINES: AmmoState = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
 const RESERVES: AmmoState = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket | null; resumeToken: string; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number; weapon: WeaponId; ammo: AmmoState; reserve: AmmoState; reloadUntil: number }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket | null; resumeToken: string; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number; lastInputAt: number; weapon: WeaponId; ammo: AmmoState; reserve: AmmoState; reloadUntil: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -123,9 +123,9 @@ export class DuelRoom {
         const resumeToken = crypto.randomUUID() + crypto.randomUUID()
         const ammo = { ...MAGAZINES }
         const reserve = { ...RESERVES }
-        player = { id: playerId, name, ready: false, socket: server, resumeToken, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 }
+        player = { id: playerId, name, ready: false, socket: server, resumeToken, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, lastInputAt: Date.now(), weapon: "pistol", ammo, reserve, reloadUntil: 0 }
         this.players.set(playerId, player)
-        server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0, resumeToken })
+        server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, lastInputAt: Date.now(), weapon: "pistol", ammo, reserve, reloadUntil: 0, resumeToken })
         server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot, resumeToken, resumed: false }))
       }
       this.updatePhase()
@@ -192,13 +192,20 @@ export class DuelRoom {
           Number.isFinite(state.lookPitch) && Math.abs(Number(state.lookPitch)) <= Math.PI / 2 &&
           typeof state.crouched === "boolean" && typeof state.aiming === "boolean"
         if (!valid) break
+        const inputNow = Date.now()
+        const elapsed = Math.min(0.5, Math.max(0.05, (inputNow - player.lastInputAt) / 1000))
+        const deltaX = Number(state.moveX) - player.x
+        const deltaZ = Number(state.moveZ) - player.z
+        const maxTravel = 7 * elapsed + 0.35
+        if (Math.hypot(deltaX, deltaZ) > maxTravel) break
+        player.lastInputAt = inputNow
         player.lastInputSeq = Number(state.seq)
         player.x = Number(state.moveX)
         player.z = Number(state.moveZ)
         player.yaw = Number(state.lookYaw)
         player.pitch = Number(state.lookPitch)
         const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
-        socket.serializeAttachment({ ...(attachment ?? {}), lastInputSeq: player.lastInputSeq, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
+        socket.serializeAttachment({ ...(attachment ?? {}), lastInputSeq: player.lastInputSeq, lastInputAt: player.lastInputAt, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
         this.broadcast({ type: "input", input: {
           seq: player.lastInputSeq, clientTime: Date.now(),
           moveX: Number(state.moveX), moveZ: Number(state.moveZ),
@@ -320,6 +327,7 @@ export class DuelRoom {
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
         lastInputSeq: attachment.lastInputSeq ?? 0,
+        lastInputAt: attachment.lastInputAt ?? Date.now(),
         weapon: attachment.weapon ?? "pistol",
         ammo: attachment.ammo ?? { ...MAGAZINES },
         reserve: attachment.reserve ?? { ...RESERVES },
@@ -406,7 +414,7 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number; roundWins?: number; weapon?: WeaponId; ammo?: AmmoState; reserve?: AmmoState; reloadUntil?: number; resumeToken?: string } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; lastInputAt?: number; x?: number; z?: number; yaw?: number; pitch?: number; health?: number; roundWins?: number; weapon?: WeaponId; ammo?: AmmoState; reserve?: AmmoState; reloadUntil?: number; resumeToken?: string } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
@@ -424,6 +432,7 @@ export class DuelRoom {
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
         lastInputSeq: attachment.lastInputSeq ?? 0,
+        lastInputAt: attachment.lastInputAt ?? Date.now(),
         weapon: attachment.weapon ?? "pistol",
         ammo: attachment.ammo ?? { ...MAGAZINES },
         reserve: attachment.reserve ?? { ...RESERVES },
