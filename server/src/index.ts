@@ -77,6 +77,7 @@ export class DuelRoom {
 
   async fetch(request: Request): Promise<Response> {
     this.restorePlayers()
+    await this.restorePendingPlayers()
     const url = new URL(request.url)
     if (url.pathname === "/internal/create" && request.method === "POST") {
       if (await this.state.storage.get<boolean>("created")) return json({ error: "exists" }, 409)
@@ -327,6 +328,28 @@ export class DuelRoom {
     }
     if (this.phase !== "finished" && this.players.size < 2) this.phase = this.players.size === 0 ? "waiting" : "ready"
     this.broadcastRoomState()
+  }
+
+  private async restorePendingPlayers(): Promise<void> {
+    const pending = await this.state.storage.list<{ expiresAt: number; player: Record<string, any> }>({ prefix: "resume:" })
+    for (const [key, saved] of pending) {
+      if (saved.expiresAt <= Date.now()) {
+        await this.state.storage.delete(key)
+        continue
+      }
+      const data = saved.player
+      if (!data?.playerId || this.players.has(data.playerId)) continue
+      this.players.set(data.playerId, {
+        ...data,
+        id: data.playerId,
+        socket: null,
+        resumeToken: key.slice("resume:".length),
+        slot: data.slot === 2 ? 2 : 1,
+        ammo: data.ammo ?? { ...MAGAZINES },
+        reserve: data.reserve ?? { ...RESERVES },
+        shotTimes: data.shotTimes ?? {},
+      } as Player)
+    }
   }
 
   private sendResumeState(socket: WebSocket, player: Player): void {
