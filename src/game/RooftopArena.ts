@@ -91,12 +91,12 @@ export class RooftopArena {
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
     this.player = this.createFighter('#e5a23b', '#263342')
-    this.player.position.set(0, 0, 2.3); roof.add(this.player)
+    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.76); roof.add(this.player)
     this.enemy = this.createFighter('#d64f48', '#20232d')
-    this.enemy.position.set(1.4, 0, -2.5); far.add(this.enemy)
+    this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(1.28); far.add(this.enemy)
     // Camera follows just behind the player, looking toward the rival rooftop.
-    this.camera.position.set(0, 6.4, 17.2)
-    this.camera.lookAt(0, 1.35, -10.5)
+    this.camera.position.set(0, 6.6, 18.2)
+    this.camera.lookAt(0, 1.25, -9.8)
   }
 
   private createFighter(jacket: string, pants: string) {
@@ -212,11 +212,11 @@ export class RooftopArena {
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 5.8 : 6.4, 5, dt)
-    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 15.9 : 17.2, 5, dt)
-    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 45 : 52, 6, dt)
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 6 : 6.6, 5, dt)
+    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 16.8 : 18.2, 5, dt)
+    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 47 : 54, 6, dt)
     this.camera.updateProjectionMatrix()
-    this.camera.lookAt(this.player.position.x * .12, 1.35, -10.5)
+    this.camera.lookAt(this.player.position.x * .12, 1.25, -9.8)
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
