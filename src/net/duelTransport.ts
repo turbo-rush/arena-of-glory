@@ -33,6 +33,7 @@ export type ServerDuelMessage =
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
   | { type: 'snapshot'; serverTick: number; ackInputSeq: number; players: { playerId: string; x: number; y: number; z: number; yaw: number; health: number; ammo: number; weapon: WeaponId; alive: boolean }[] }
+  | { type: 'health_update'; health: number; damage: number; hitZone: HitZone; shooterId: string }
   | { type: 'shot_result'; shotId: number; shooterId: string; hitPlayerId: string | null; hitZone: HitZone | null; damage: number; targetHealth: number | null; accepted: boolean }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
@@ -87,6 +88,8 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
     case 'snapshot':
       return isNumber(value.serverTick) && isNumber(value.ackInputSeq) && Array.isArray(value.players)
         ? value as ServerDuelMessage : null
+    case 'health_update':
+      return isNumber(value.health) && isNumber(value.damage) && (value.hitZone === 'head' || value.hitZone === 'body') && isString(value.shooterId) ? value as ServerDuelMessage : null
     case 'shot_result':
       return isNumber(value.shotId) && isString(value.shooterId) &&
         (value.hitPlayerId === null || isString(value.hitPlayerId)) &&
