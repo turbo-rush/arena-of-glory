@@ -131,6 +131,19 @@ export class DuelRoom {
         }
         break
       }
+      case "continue_round": {
+        if (this.phase !== "round_break") break
+        player.ready = true
+        const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
+        socket.serializeAttachment({ ...(attachment ?? {}), ready: true })
+        if (this.players.size === 2 && [...this.players.values()].every(candidate => candidate.ready)) {
+          this.phase = "fighting"
+          const roundNumber = [...this.players.values()].reduce((sum, candidate) => sum + candidate.roundWins, 0) + 1
+          this.broadcast({ type: "round_started", roundNumber, serverTime: Date.now() })
+          this.broadcastRoomState()
+        }
+        break
+      }
       case "input": {
         if (this.phase !== "fighting") break
         const input = message.input
