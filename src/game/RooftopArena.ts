@@ -43,6 +43,9 @@ export class RooftopArena {
   private peekDirection: -1 | 0 | 1 = 0
   private enemyCovering = false
   private enemyCoverTimer = 0
+  private enemyPeeking = false
+  private enemyPeekTimer = 0
+  private enemyStrafeDirection = 1
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -203,7 +206,7 @@ export class RooftopArena {
     })
   }
   private isEnemyProtected() {
-    if (!this.enemyCovering) return false
+    if (!this.enemyCovering || this.enemyPeeking) return false
     const p = new THREE.Vector3(); this.enemy.getWorldPosition(p)
     return p.z < -14.8 && Math.abs(p.x - 4.2) < 1.15
   }
@@ -383,12 +386,22 @@ export class RooftopArena {
         this.enemyCovering = this.enemyHealth < 60 ? Math.random() < .72 : !this.enemyCovering
       }
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
+      if (this.enemyCovering) {
+        this.enemyPeekTimer += dt
+        if (this.enemyPeekTimer >= 3.2) this.enemyPeekTimer = 0
+        this.enemyPeeking = this.enemyPeekTimer > 2.15
+      } else {
+        this.enemyPeekTimer = 0
+        this.enemyPeeking = false
+      }
       const enemyTorso = this.enemy.userData.torso as THREE.Mesh
       ;(enemyTorso.material as THREE.MeshStandardMaterial).color.set(this.enemyHitTimer > 0 ? '#ffb0a0' : '#d64f48')
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       this.enemy.rotation.x = THREE.MathUtils.damp(this.enemy.rotation.x, this.enemyHitTimer > 0 ? -.09 : 0, 10, dt)
       const enemyBaseX = 1.4
-      const enemyTargetX = this.enemyCovering ? 4.2 : enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
+      const enemyStrafe = Math.sin(this.enemyWalkTime * .72) * 1.65
+      const playerWorldX = this.player.position.x
+      const enemyTargetX = this.enemyCovering ? (this.enemyPeeking ? 5.65 : 4.2) : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 2.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 2.8, dt)
@@ -399,18 +412,18 @@ export class RooftopArena {
         leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.enemyCovering ? -.72 + stride * .2 : stride, 9, dt)
       })
       this.enemy.rotation.y = Math.PI
-      this.enemy.position.y = this.enemyCovering ? -.32 : Math.abs(Math.sin(this.enemyWalkTime * 2.2)) * .045
+      this.enemy.position.y = this.enemyCovering ? (this.enemyPeeking ? -.08 : -.32) : Math.abs(Math.sin(this.enemyWalkTime * 2.2)) * .045
       const enemyTorsoGroup = this.enemy.userData.torso as THREE.Mesh
       enemyTorsoGroup.rotation.z = THREE.MathUtils.damp(enemyTorsoGroup.rotation.z, Math.sin(this.enemyWalkTime * 1.7) * (enemyMoving ? .045 : .018), 7, dt)
       const enemyHead = this.enemy.userData.head as THREE.Mesh
       enemyHead.rotation.x = THREE.MathUtils.damp(enemyHead.rotation.x, Math.sin(this.enemyWalkTime * 1.35) * .035, 6, dt)
       // Keep the weapon raised toward the player; lower it slightly while tucked behind cover.
       const enemyArm = this.enemy.userData.arm as THREE.Group
-      enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering ? -.08 : -.24, 7, dt)
+      enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
       this.enemyTimer += dt
-      if (this.enemyTimer > 2.8 && this.enemyHealth > 0) {
+      if (this.enemyTimer > (this.enemyHealth < 45 ? 2.25 : 2.65) && this.enemyHealth > 0) {
         this.enemyTimer = 0
-        if (Math.random() > .2) {
+        if (Math.random() > .12) {
           const protectedByCover = this.isPlayerProtected()
           const enemyOrigin = new THREE.Vector3(); this.enemy.localToWorld(enemyOrigin.set(.46, 1.04, .35))
           const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, 1.2, 0))
