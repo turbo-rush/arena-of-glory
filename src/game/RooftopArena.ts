@@ -46,6 +46,7 @@ export class RooftopArena {
   private enemyPeeking = false
   private enemyPeekTimer = 0
   private enemyStrafeDirection = 1
+  private enemyShotWindup = 0
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -419,19 +420,30 @@ export class RooftopArena {
       enemyHead.rotation.x = THREE.MathUtils.damp(enemyHead.rotation.x, Math.sin(this.enemyWalkTime * 1.35) * .035, 6, dt)
       // Keep the weapon raised toward the player; lower it slightly while tucked behind cover.
       const enemyArm = this.enemy.userData.arm as THREE.Group
-      enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
+      // Telegraph incoming shots by raising the weapon before the actual hit check.
       this.enemyTimer += dt
-      if (this.enemyTimer > (this.enemyHealth < 45 ? 2.25 : 2.65) && this.enemyHealth > 0) {
-        this.enemyTimer = 0
-        if (Math.random() > .12) {
+      if (this.enemyShotWindup > 0) {
+        this.enemyShotWindup = Math.max(0, this.enemyShotWindup - dt)
+        enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, -.62, 12, dt)
+        if (this.enemyShotWindup === 0) {
           const protectedByCover = this.isPlayerProtected()
           const enemyOrigin = new THREE.Vector3(); this.enemy.localToWorld(enemyOrigin.set(.46, 1.04, .35))
-          const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, 1.2, 0))
+          const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, this.crouched ? .78 : 1.2, 0))
           const clearShot = this.hasLineOfSight(enemyOrigin, playerTarget)
-          if (!protectedByCover && clearShot && !this.isEnemyProtected()) this.health = Math.max(0, this.health - (Math.random() > .5 ? 8 : 12))
+          if (!protectedByCover && clearShot && !this.isEnemyProtected()) {
+            const baseDamage = this.enemyHealth < 45 ? 11 : 8
+            this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 3 : baseDamage))
+            this.spawnImpact(playerTarget, '#ff805e', 5)
+          }
           if (!this.isEnemyProtected()) this.flash(this.enemy)
           this.publish()
           if (this.health === 0) this.finish('DEFEAT')
+        }
+      } else {
+        enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
+        if (this.enemyTimer > (this.enemyHealth < 45 ? 2.25 : 2.65) && this.enemyHealth > 0) {
+          this.enemyTimer = 0
+          if (Math.random() > .12 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = .42
         }
       }
     }
