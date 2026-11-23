@@ -254,10 +254,12 @@ export class RooftopArena {
     }
   }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
-  startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void) {
+  startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void, onLocalReload: () => void, onLocalSwitchWeapon: (weapon: WeaponId) => void) {
     this.onlineMode = true
     this.onLocalInput = onLocalInput
     this.onLocalFire = onLocalFire
+    this.onLocalReload = onLocalReload
+    this.onLocalSwitchWeapon = onLocalSwitchWeapon
     this.networkTimer = 0
     this.inputSequence = 0
     this.remoteTarget.set(this.enemy.position.x, this.enemy.position.y, this.enemy.position.z)
