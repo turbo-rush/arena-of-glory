@@ -509,7 +509,8 @@ export class RooftopArena {
       this.enemyFlankCooldown = Math.max(0, this.enemyFlankCooldown - dt)
       if (this.isPlayerProtected() && playerDisplacement < .035) this.playerCampTimer += dt
       else this.playerCampTimer = Math.max(0, this.playerCampTimer - dt * 2.5)
-      if (this.playerCampTimer > 3.8 && this.enemyFlankCooldown <= 0) {
+      const flankThreshold = this.weapon === 'sniper' ? 3.1 : 3.8
+      if (this.playerCampTimer > flankThreshold && this.enemyFlankCooldown <= 0) {
         // Punish prolonged passive cover play by rotating to the opposite rooftop angle.
         this.enemyFlankTimer = 2.9
         this.enemyFlankCooldown = 8.5
@@ -519,7 +520,7 @@ export class RooftopArena {
       }
       this.enemyFlankTimer = Math.max(0, this.enemyFlankTimer - dt)
       this.enemyCoverTimer += dt
-      const coverDecisionInterval = this.enemyHealth < 60 ? 2.9 : 3.8
+      const coverDecisionInterval = this.weapon === 'sniper' ? 2.45 : this.weapon === 'shotgun' ? 3.2 : this.enemyHealth < 60 ? 2.9 : 3.8
       if (this.enemyCoverTimer > coverDecisionInterval) {
         this.enemyCoverTimer = 0
         // A wounded opponent favors cover; otherwise it alternates between strafing and cover.
@@ -529,8 +530,9 @@ export class RooftopArena {
       this.enemyDodgeTimer = Math.max(0, this.enemyDodgeTimer - dt)
       if (this.enemyCovering) {
         this.enemyPeekTimer += dt
-        if (this.enemyPeekTimer >= 2.55) this.enemyPeekTimer = 0
-        this.enemyPeeking = this.enemyPeekTimer > 1.45
+        const peekCycle = this.weapon === 'sniper' ? 2.2 : 2.55
+        if (this.enemyPeekTimer >= peekCycle) this.enemyPeekTimer = 0
+        this.enemyPeeking = this.enemyPeekTimer > (this.weapon === 'sniper' ? 1.72 : 1.45)
       } else {
         this.enemyPeekTimer = 0
         this.enemyPeeking = false
@@ -540,7 +542,9 @@ export class RooftopArena {
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       this.enemy.rotation.x = THREE.MathUtils.damp(this.enemy.rotation.x, this.enemyHitTimer > 0 ? -.09 : 0, 10, dt)
       const enemyBaseX = 1.4
-      const enemyStrafe = Math.sin(this.enemyWalkTime * 1.05) * 2.05
+      const strafeSpeed = this.weapon === 'sniper' ? 1.45 : 1.05
+      const strafeWidth = this.weapon === 'sniper' ? 2.45 : this.weapon === 'rifle' ? 2.25 : 2.05
+      const enemyStrafe = Math.sin(this.enemyWalkTime * strafeSpeed) * strafeWidth
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyDodgeTimer > 0
         ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyDodgeDirection * 2.35, -4.1, 4.1)
@@ -549,7 +553,8 @@ export class RooftopArena {
           : this.enemyCovering
             ? (this.enemyPeeking ? 5.65 : 4.2)
             : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
-      const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
+      // Keep distance from close-range shotguns; pressure sniper users with faster rotations.
+      const enemyTargetZ = this.enemyCovering ? -3.35 : this.weapon === 'shotgun' ? -4.1 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
@@ -590,7 +595,8 @@ export class RooftopArena {
         enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
         if (this.enemyTimer > (this.enemyHealth < 45 ? 1.65 : 2.0) && this.enemyHealth > 0) {
           this.enemyTimer = 0
-          if (Math.random() > .04 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = .32
+          const reactionWindup = this.weapon === 'sniper' ? .27 : .32
+          if (Math.random() > .04 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = reactionWindup
         }
       }
     }
