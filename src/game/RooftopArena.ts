@@ -1,7 +1,15 @@
 import * as THREE from 'three'
 
-export type GameState = { health: number; enemyHealth: number; ammo: number; reloading: boolean; status: 'FIGHT' | 'VICTORY' | 'DEFEAT'; kills: number }
+export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
+export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'VICTORY' | 'DEFEAT'; kills: number }
 type StateListener = (state: GameState) => void
+const WEAPONS: Record<WeaponId, { name: string; subtitle: string; magazine: number; reserve: number; damage: number; headMultiplier: number; spread: number; pellets: number }> = {
+  pistol: { name: 'VX-9 SIDEARM', subtitle: 'SEMI-AUTO // 9MM', magazine: 12, reserve: 48, damage: 18, headMultiplier: 2.2, spread: .42, pellets: 1 },
+  rifle: { name: 'AR-4 STRIKER', subtitle: 'FULL-AUTO // 5.56MM', magazine: 30, reserve: 120, damage: 12, headMultiplier: 1.8, spread: .34, pellets: 1 },
+  shotgun: { name: 'BREACH-12', subtitle: 'PUMP ACTION // 12 GA', magazine: 6, reserve: 30, damage: 7, headMultiplier: 1.25, spread: .95, pellets: 6 },
+  sniper: { name: 'M-90 LONGSHOT', subtitle: 'BOLT ACTION // .308', magazine: 5, reserve: 20, damage: 48, headMultiplier: 2.5, spread: .1, pellets: 1 }
+}
+const WEAPON_ORDER: WeaponId[] = ['pistol', 'rifle', 'shotgun', 'sniper']
 
 export class RooftopArena {
   private scene = new THREE.Scene()
@@ -15,7 +23,9 @@ export class RooftopArena {
   private frame = 0
   private health = 100
   private enemyHealth = 100
-  private ammo = 12
+  private weapon: WeaponId = 'pistol'
+  private ammo = WEAPONS.pistol.magazine
+  private reserveAmmo = WEAPONS.pistol.reserve
   private enemyTimer = 0
   private started = false
   private disposed = false
@@ -170,15 +180,24 @@ export class RooftopArena {
   shoot() {
     if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
+    const config = WEAPONS[this.weapon]
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
-    const target = new THREE.Vector3(); this.enemy.localToWorld(target.set(0, 1.2, 0))
-    target.x += (Math.random() - .5) * (this.aiming ? .22 : .7)
-    target.y += (Math.random() - .5) * (this.aiming ? .18 : .55)
-    const hit = this.hasLineOfSight(origin, target) && origin.distanceTo(target) > 0
-    if (hit) { this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 25 : 16)); this.enemyHitTimer = .3 }
+    let totalDamage = 0
+    let headshot = false
+    for (let pellet = 0; pellet < config.pellets; pellet++) {
+      const isHead = Math.random() < (this.aiming ? .38 : .16) * (this.weapon === 'sniper' ? 1.45 : 1)
+      const target = new THREE.Vector3(); this.enemy.localToWorld(target.set((Math.random() - .5) * config.spread, isHead ? 1.96 : 1.2, 0))
+      target.x += (Math.random() - .5) * (this.aiming ? .12 : config.spread)
+      target.y += (Math.random() - .5) * (this.aiming ? .1 : config.spread * .55)
+      if (this.hasLineOfSight(origin, target) && !this.isEnemyProtected() && origin.distanceTo(target) > 0) {
+        totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
+        if (isHead) headshot = true
+      }
+    }
+    if (totalDamage > 0) { this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = .3 }
     this.recoil = 1
     this.flash(this.player)
-    this.showTracer(hit)
+    this.showTracer(totalDamage > 0)
     this.publish()
     if (this.enemyHealth === 0) this.finish('VICTORY')
   }
@@ -202,14 +221,25 @@ export class RooftopArena {
       if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose(); this.tracer = null }
     }, 110)
   }
-  reload() {
-    if (this.ammo === 12 || !this.started) return
-    this.ammo = 12; this.publish()
+  switchWeapon() {
+    const index = WEAPON_ORDER.indexOf(this.weapon)
+    this.weapon = WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length]
+    const config = WEAPONS[this.weapon]
+    this.ammo = config.magazine
+    this.reserveAmmo = config.reserve
+    this.publish()
   }
-  reset() { this.health = 100; this.enemyHealth = 100; this.ammo = 12; this.started = true; this.publish() }
+  reload() {
+    const config = WEAPONS[this.weapon]
+    if (this.ammo === config.magazine || this.reserveAmmo <= 0 || !this.started) return
+    const needed = config.magazine - this.ammo
+    const loaded = Math.min(needed, this.reserveAmmo)
+    this.ammo += loaded; this.reserveAmmo -= loaded; this.publish()
+  }
+  reset() { this.health = 100; this.enemyHealth = 100; this.weapon = 'pistol'; this.ammo = WEAPONS.pistol.magazine; this.reserveAmmo = WEAPONS.pistol.reserve; this.started = true; this.publish() }
   private finish(status: 'VICTORY' | 'DEFEAT') { this.started = false; this.publish(status) }
   private publish(status: GameState['status'] = 'FIGHT') {
-    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reloading: false, status, kills: status === 'VICTORY' ? 1 : 0 })
+    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: false, status, kills: status === 'VICTORY' ? 1 : 0 })
   }
 
   private resize() {
