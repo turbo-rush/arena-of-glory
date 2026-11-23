@@ -60,6 +60,12 @@ export default function App() {
         else gameRef.current?.applyOnlineShotResult(message.damage > 0, message.damage, message.targetHealth, message.hitZone)
       } else if (message.type === 'health_update') {
         gameRef.current?.applyOnlineDamage(message.health, message.damage, message.hitZone)
+      } else if (message.type === 'round_ended') {
+        gameRef.current?.applyOnlineRoundResult(message.roundNumber, message.winnerPlayerId === myPlayerId)
+        setStarted(true)
+      } else if (message.type === 'match_ended') {
+        gameRef.current?.applyOnlineMatchResult(message.winnerPlayerId === myPlayerId)
+        setStarted(false)
       } else if (message.type === 'error') {
         setRoomError(message.message)
       }
