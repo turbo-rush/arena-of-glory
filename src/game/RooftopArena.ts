@@ -609,9 +609,11 @@ export class RooftopArena {
         const arm = this.player.userData.arm as THREE.Group
         arm.rotation.x = THREE.MathUtils.damp(arm.rotation.x, .95, 8, dt)
         if (this.reloadTimer <= 0) {
-          const config = WEAPONS[this.weapon]
-          const loaded = Math.min(config.magazine - this.ammo, this.reserveAmmo)
-          this.ammo += loaded; this.reserveAmmo -= loaded
+          if (!this.onlineMode) {
+            const config = WEAPONS[this.weapon]
+            const loaded = Math.min(config.magazine - this.ammo, this.reserveAmmo)
+            this.ammo += loaded; this.reserveAmmo -= loaded
+          }
           this.reloading = false
           arm.rotation.x = 0
           this.ammoByWeapon[this.weapon] = this.ammo
