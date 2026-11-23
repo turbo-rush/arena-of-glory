@@ -212,7 +212,7 @@ export class RooftopArena {
     const arena = ARENAS[this.arenaIndex]
     this.scene.background = new THREE.Color(arena.sky)
     this.scene.fog = new THREE.Fog(arena.fog, 35, 115)
-    this.ground.material.color.set(arena.ground)
+    if (this.ground.material instanceof THREE.MeshStandardMaterial) this.ground.material.color.set(arena.ground)
     this.sun.color.set(arena.sun)
     this.sun.intensity = this.arenaIndex === 2 ? 2.2 : 3.2
     this.hemisphere.intensity = this.arenaIndex === 2 ? 1.35 : 2.1
