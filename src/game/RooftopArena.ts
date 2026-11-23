@@ -28,6 +28,8 @@ export class RooftopArena {
   private inputSequence = 0
   private onLocalInput?: (input: DuelInput) => void
   private onLocalFire?: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void
+  private onLocalReload?: () => void
+  private onLocalSwitchWeapon?: (weapon: WeaponId) => void
   private remoteCrouched = false
   private remoteTarget = new THREE.Vector3(1.4, 0, -1.7)
   private remoteTargetYaw = Math.PI
