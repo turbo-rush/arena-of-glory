@@ -29,6 +29,8 @@ export class RooftopArena {
   private onLocalInput?: (input: DuelInput) => void
   private onLocalFire?: (weapon: WeaponId) => void
   private remoteCrouched = false
+  private remoteTarget = new THREE.Vector3(1.4, 0, -1.7)
+  private remoteTargetYaw = Math.PI
   private keys = new Set<string>()
   private touchKeys = new Set<string>()
   private clock = new THREE.Clock()
@@ -256,6 +258,8 @@ export class RooftopArena {
     this.onLocalFire = onLocalFire
     this.networkTimer = 0
     this.inputSequence = 0
+    this.remoteTarget.set(this.enemy.position.x, this.enemy.position.y, this.enemy.position.z)
+    this.remoteTargetYaw = this.enemy.rotation.y
     this.started = true
     this.gameStatus = 'FIGHT'
     this.enemyHealth = 100
@@ -269,11 +273,11 @@ export class RooftopArena {
   }
   applyRemoteInput(input: DuelInput) {
     if (!this.onlineMode) return
-    this.enemy.position.x = THREE.MathUtils.clamp(input.moveX, -6.8, 6.8)
-    this.enemy.position.z = THREE.MathUtils.clamp(input.moveZ, -1.8, 6.5)
+    this.remoteTarget.x = THREE.MathUtils.clamp(input.moveX, -6.8, 6.8)
+    this.remoteTarget.z = THREE.MathUtils.clamp(input.moveZ, -1.8, 6.5)
     this.remoteCrouched = input.crouched
-    this.enemy.position.y = input.crouched ? -.32 : 0
-    this.enemy.rotation.y = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
+    this.remoteTarget.y = input.crouched ? -.32 : 0
+    this.remoteTargetYaw = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
     const legs = this.enemy.userData.legs as THREE.Mesh[]
     legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
   }
@@ -698,6 +702,10 @@ export class RooftopArena {
       }
       } else {
         this.enemyWalkTime += dt
+        this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, this.remoteTarget.x, 13, dt)
+        this.enemy.position.y = THREE.MathUtils.damp(this.enemy.position.y, this.remoteTarget.y, 13, dt)
+        this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, this.remoteTarget.z, 13, dt)
+        this.enemy.rotation.y = THREE.MathUtils.damp(this.enemy.rotation.y, this.remoteTargetYaw, 13, dt)
         this.networkTimer += dt
         if (this.networkTimer >= 0.05) {
           this.networkTimer = 0
