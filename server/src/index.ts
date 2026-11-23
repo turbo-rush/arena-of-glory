@@ -91,7 +91,6 @@ export class DuelRoom {
       const slot = (this.players.size + 1) as 1 | 2
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      server.serializeAttachment({ playerId, name, slot })
       this.players.set(playerId, { id: playerId, name, ready: false, socket: server, shotTimes: {}, lastShotId: 0 })
       server.serializeAttachment({ playerId, name, slot, ready: false, shotTimes: {}, lastShotId: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
