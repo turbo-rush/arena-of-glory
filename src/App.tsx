@@ -57,6 +57,8 @@ export default function App() {
         gameRef.current?.applyRemoteInput(message.input)
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
+      } else if (message.type === 'resume_state') {
+        gameRef.current?.applyOnlineResume(message.health)
       } else if (message.type === 'loadout_update') {
         gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
       } else if (message.type === 'switch_weapon') {
