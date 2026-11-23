@@ -51,7 +51,10 @@ export default {
     const match = url.pathname.match(/^\/api\/rooms\/([A-HJ-NP-Z2-9]{6})\/ws$/)
     if (match && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       const id = env.DUEL_ROOMS.idFromName(match[1])
-      return env.DUEL_ROOMS.get(id).fetch("https://duel.internal/ws?roomCode=" + match[1], request)
+      const target = new URL("https://duel.internal/ws")
+      target.searchParams.set("roomCode", match[1])
+      target.searchParams.set("name", url.searchParams.get("name") ?? "PLAYER")
+      return env.DUEL_ROOMS.get(id).fetch(new Request(target.toString(), request))
     }
     return json({ error: "not_found" }, 404)
   },
@@ -90,6 +93,7 @@ export class DuelRoom {
       server.serializeAttachment({ playerId, name, slot })
       this.players.set(playerId, { id: playerId, name, ready: false, socket: server })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
+      this.updatePhase()
       this.broadcastRoomState()
       return new Response(null, { status: 101, webSocket: client })
     }
