@@ -12,3 +12,6 @@
 
 /* Combat feedback: readable hit confirmation and brief incoming-damage pulse. */
 .hit-feedback{position:absolute;z-index:3;left:50%;top:43%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff1c8;text-shadow:0 2px 10px #000,0 0 18px #ff9c42;pointer-events:none;animation:hit-pop .62s ease-out both}.hit-feedback b{font:900 13px 'Barlow Condensed';letter-spacing:3px}.hit-crosshair{font-size:27px;line-height:1}.hit-feedback.is-headshot{color:#fff0a0;text-shadow:0 2px 10px #000,0 0 22px #ffcf4d}.hit-feedback.is-headshot b{font-size:17px;letter-spacing:4px}@keyframes hit-pop{0%{opacity:0;scale:.55}18%{opacity:1;scale:1.12}38%{scale:1}100%{opacity:0;translate:0 -18px}}.damage-flash{position:absolute;z-index:2;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 rgba(255,45,35,0);animation:damage-pulse .34s ease-out both}@keyframes damage-pulse{0%{box-shadow:inset 0 0 0 0 rgba(255,45,35,0)}25%{box-shadow:inset 0 0 90px 18px rgba(255,45,35,.42)}100%{box-shadow:inset 0 0 0 0 rgba(255,45,35,0)}}
+
+/* Explosive barrel detonation feedback. */
+.hit-feedback.is-explosion{color:#ffd36b;text-shadow:0 2px 12px #000,0 0 28px #ff6a24}.hit-feedback.is-explosion b{font-size:20px;letter-spacing:4px}
