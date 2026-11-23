@@ -330,7 +330,7 @@ export class RooftopArena {
       this.player.rotation.z = THREE.MathUtils.damp(this.player.rotation.z, this.peekDirection * -.2, 9, dt)
       this.player.rotation.x = THREE.MathUtils.damp(this.player.rotation.x, this.crouched ? .12 : 0, 9, dt)
       const playerArm = this.player.userData.arm as THREE.Group
-      playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
+      playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
       this.enemyCoverTimer += dt
