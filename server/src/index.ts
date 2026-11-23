@@ -60,7 +60,8 @@ export default {
   },
 }
 
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket }
+type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -91,7 +92,8 @@ export class DuelRoom {
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
       server.serializeAttachment({ playerId, name, slot })
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server })
+      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, shotTimes: {}, lastShotId: 0 })
+      server.serializeAttachment({ playerId, name, slot, ready: false, shotTimes: {}, lastShotId: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
       this.updatePhase()
       this.broadcastRoomState()
@@ -131,7 +133,37 @@ export class DuelRoom {
         break
       }
       case "input":
-      case "fire":
+        if (this.phase === "fighting") this.broadcast(message, socket)
+        break
+      case "fire": {
+        if (this.phase !== "fighting") break
+        const weapon = message.weapon
+        const shotId = message.shotId
+        const aimYaw = message.aimYaw
+        const aimPitch = message.aimPitch
+        const cooldowns: Record<WeaponId, number> = { pistol: 220, rifle: 115, shotgun: 650, sniper: 850 }
+        if (!["pistol", "rifle", "shotgun", "sniper"].includes(String(weapon)) ||
+            !Number.isSafeInteger(shotId) || Number(shotId) <= player.lastShotId ||
+            typeof aimYaw !== "number" || !Number.isFinite(aimYaw) ||
+            typeof aimPitch !== "number" || !Number.isFinite(aimPitch) || Math.abs(aimPitch) > Math.PI / 2) {
+          socket.send(JSON.stringify({ type: "shot_result", shotId: Number.isSafeInteger(shotId) ? shotId : 0, shooterId: player.id, hitPlayerId: null, hitZone: null, damage: 0, targetHealth: null, accepted: false }))
+          break
+        }
+        const typedWeapon = weapon as WeaponId
+        const now = Date.now()
+        const lastShotAt = player.shotTimes[typedWeapon] ?? 0
+        if (now - lastShotAt < cooldowns[typedWeapon]) {
+          socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: null, hitZone: null, damage: 0, targetHealth: null, accepted: false }))
+          break
+        }
+        player.shotTimes[typedWeapon] = now
+        player.lastShotId = Number(shotId)
+        const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
+        socket.serializeAttachment({ ...(attachment ?? {}), shotTimes: player.shotTimes, lastShotId: player.lastShotId })
+        socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: null, hitZone: null, damage: 0, targetHealth: null, accepted: true }))
+        this.broadcast(message, socket)
+        break
+      }
       case "reload":
       case "switch_weapon":
         if (this.phase === "fighting") this.broadcast(message, socket)
@@ -161,13 +193,15 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
         name: attachment.name ?? "PLAYER",
         ready: attachment.ready === true,
         socket,
+        shotTimes: attachment.shotTimes ?? {},
+        lastShotId: attachment.lastShotId ?? 0,
       })
     }
     this.updatePhase()
