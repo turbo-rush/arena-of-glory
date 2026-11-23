@@ -43,7 +43,7 @@ export default function App() {
         setMyPlayerId(message.playerId)
       } else if (message.type === 'room_state') {
         setRoomPlayers(message.players)
-        setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' ? 'ready' : 'waiting')
+        setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
       } else if (message.type === 'match_started') {
         setRoomPhase('fighting')
         setStarted(true)
@@ -59,6 +59,8 @@ export default function App() {
         gameRef.current?.applyRemoteFire()
       } else if (message.type === 'resume_state') {
         gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins)
+        setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
+        setStarted(message.phase === 'fighting' || message.phase === 'round_break')
       } else if (message.type === 'loadout_update') {
         gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
       } else if (message.type === 'switch_weapon') {
