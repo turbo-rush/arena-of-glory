@@ -38,6 +38,8 @@ export type ServerDuelMessage =
   | { type: 'health_update'; health: number; damage: number; hitZone: HitZone; shooterId: string }
   | { type: 'shot_result'; shotId: number; shooterId: string; hitPlayerId: string | null; hitZone: HitZone | null; damage: number; targetHealth: number | null; accepted: boolean }
   | { type: 'loadout_update'; weapon: WeaponId; ammo: number; reserveAmmo: number; reloading: boolean }
+  | { type: 'reload'; weapon: WeaponId }
+  | { type: 'switch_weapon'; weapon: WeaponId }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'pong'; clientTime: number; serverTime: number }
@@ -103,6 +105,9 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
         typeof value.accepted === 'boolean' ? value as ServerDuelMessage : null
     case 'loadout_update':
       return isWeapon(value.weapon) && isNumber(value.ammo) && isNumber(value.reserveAmmo) && typeof value.reloading === 'boolean' ? value as ServerDuelMessage : null
+    case 'reload':
+    case 'switch_weapon':
+      return isWeapon(value.weapon) ? value as ServerDuelMessage : null
     case 'round_ended':
     case 'match_ended':
       return (value.winnerPlayerId === null || isString(value.winnerPlayerId)) &&
