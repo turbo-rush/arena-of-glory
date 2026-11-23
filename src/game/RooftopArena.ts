@@ -23,6 +23,7 @@ export class RooftopArena {
   private walkTime = 0
   private enemyWalkTime = 0
   private recoil = 0
+  private enemyHitTimer = 0
   private muzzleTimer = 0
   private tracer: THREE.Line | null = null
   private listener: StateListener
@@ -91,12 +92,12 @@ export class RooftopArena {
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
     this.player = this.createFighter('#e5a23b', '#263342')
-    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.76); roof.add(this.player)
+    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('#d64f48', '#20232d')
     this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(1.28); far.add(this.enemy)
     // Camera follows just behind the player, looking toward the rival rooftop.
-    this.camera.position.set(0, 6.6, 18.2)
-    this.camera.lookAt(0, 1.25, -9.8)
+    this.camera.position.set(0, 7.4, 20.2)
+    this.camera.lookAt(0, 1.3, -9.4)
   }
 
   private createFighter(jacket: string, pants: string) {
@@ -113,6 +114,7 @@ export class RooftopArena {
     const gun = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, .72), this.material('#20242b', .4)); gun.position.set(.03, -.38, -.48); arm.add(gun)
     const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
+    group.userData.torso = torso
     group.userData.arm = arm
     group.userData.legs = legs
     group.userData.baseY = 0
@@ -126,7 +128,7 @@ export class RooftopArena {
     if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
     const hit = Math.random() > (this.aiming ? .08 : .24)
-    if (hit) this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 25 : 16))
+    if (hit) { this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 25 : 16)); this.enemyHitTimer = .3 }
     this.recoil = 1
     this.flash(this.player)
     this.showTracer(hit)
@@ -194,6 +196,10 @@ export class RooftopArena {
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
+      this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
+      const enemyTorso = this.enemy.userData.torso as THREE.Mesh
+      ;(enemyTorso.material as THREE.MeshStandardMaterial).color.set(this.enemyHitTimer > 0 ? '#ffb0a0' : '#d64f48')
+      this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       const enemyBaseX = 1.4
       this.enemy.position.x = enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
@@ -212,11 +218,11 @@ export class RooftopArena {
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 6 : 6.6, 5, dt)
-    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 16.8 : 18.2, 5, dt)
-    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 47 : 54, 6, dt)
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 6.6 : 7.4, 5, dt)
+    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 18.4 : 20.2, 5, dt)
+    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 48 : 56, 6, dt)
     this.camera.updateProjectionMatrix()
-    this.camera.lookAt(this.player.position.x * .12, 1.25, -9.8)
+    this.camera.lookAt(this.player.position.x * .12, 1.3, -9.4)
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
