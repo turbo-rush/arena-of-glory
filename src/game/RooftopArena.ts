@@ -56,6 +56,8 @@ export class RooftopArena {
   private enemyPeekTimer = 0
   private enemyStrafeDirection = 1
   private enemyShotWindup = 0
+  private enemyDodgeTimer = 0
+  private enemyDodgeDirection = 1
   private roundsWon = 0
   private roundsLost = 0
   private roundNumber = 1
@@ -262,6 +264,7 @@ export class RooftopArena {
     this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.reloadTimer = 0
     this.aiming = false; this.crouched = false; this.peekDirection = 0
     this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
+    this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
     this.recoil = 0; this.player.position.set(0, 0, 2.3); this.enemy.position.set(1.4, 0, -1.7)
     this.player.rotation.set(0, Math.PI, 0); this.enemy.rotation.set(0, Math.PI, 0)
@@ -338,6 +341,10 @@ export class RooftopArena {
       this.hitFeedbackId++
       this.hitFeedbackTimer = .62
       this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = headHits > 0 ? .48 : .3
+      // A confirmed hit triggers an evasive counter-move instead of letting the rival stay exposed.
+      this.enemyDodgeTimer = headHits > 0 ? 1.05 : .78
+      this.enemyDodgeDirection = this.enemy.position.x >= this.player.position.x ? 1 : -1
+      this.enemyCovering = false; this.enemyPeeking = false; this.enemyPeekTimer = 0
       const impact = new THREE.Vector3(); this.enemy.localToWorld(impact.set((Math.random() - .5) * .38, headHits > 0 ? 1.93 : 1.2, 0))
       this.spawnImpact(impact, headHits > 0 ? '#fff0a0' : this.weapon === 'sniper' ? '#9fe8ff' : '#ff9b54', headHits > 0 ? 12 : this.weapon === 'shotgun' ? 12 : 7)
     }
@@ -498,6 +505,7 @@ export class RooftopArena {
         this.enemyCovering = this.enemyHealth < 60 ? Math.random() < .72 : !this.enemyCovering
       }
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
+      this.enemyDodgeTimer = Math.max(0, this.enemyDodgeTimer - dt)
       if (this.enemyCovering) {
         this.enemyPeekTimer += dt
         if (this.enemyPeekTimer >= 2.55) this.enemyPeekTimer = 0
@@ -513,7 +521,11 @@ export class RooftopArena {
       const enemyBaseX = 1.4
       const enemyStrafe = Math.sin(this.enemyWalkTime * 1.05) * 2.05
       const playerWorldX = this.player.position.x
-      const enemyTargetX = this.enemyCovering ? (this.enemyPeeking ? 5.65 : 4.2) : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
+      const enemyTargetX = this.enemyDodgeTimer > 0
+        ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyDodgeDirection * 2.35, -4.1, 4.1)
+        : this.enemyCovering
+          ? (this.enemyPeeking ? 5.65 : 4.2)
+          : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
