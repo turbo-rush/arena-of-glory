@@ -307,8 +307,16 @@ export class RooftopArena {
     if (won) this.roundsWon++
     else this.roundsLost++
     this.roundNumber = roundNumber
+    this.started = false
+    this.gameStatus = 'ROUND_BREAK'
+    this.publish()
+  }
+  startOnlineRound(roundNumber: number) {
+    if (!this.onlineMode) return
+    this.roundNumber = roundNumber
     this.resetRoundState()
     this.applyArena((roundNumber - 1) % ARENAS.length)
+    this.intermissionTimer = 0
     this.gameStatus = 'FIGHT'
     this.started = true
     this.publish()
