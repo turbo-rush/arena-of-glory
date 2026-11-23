@@ -277,6 +277,12 @@ export class RooftopArena {
     const legs = this.enemy.userData.legs as THREE.Mesh[]
     legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
   }
+  rejectOnlineShot() {
+    if (!this.onlineMode) return
+    const magazine = WEAPONS[this.weapon].magazine
+    this.ammo = Math.min(magazine, this.ammo + 1)
+    this.publish()
+  }
   applyRemoteFire() {
     if (!this.onlineMode) return
     const muzzle = this.enemy.userData.muzzle as THREE.Mesh
