@@ -58,6 +58,10 @@ export class RooftopArena {
   private enemyShotWindup = 0
   private enemyDodgeTimer = 0
   private enemyDodgeDirection = 1
+  private playerAimTimer = 0
+  private enemyAimBreakTimer = 0
+  private enemyAimBreakCooldown = 0
+  private enemyAimBreakDirection = 1
   private playerCampTimer = 0
   private enemyFlankTimer = 0
   private enemyFlankCooldown = 0
@@ -271,6 +275,7 @@ export class RooftopArena {
     this.aiming = false; this.crouched = false; this.peekDirection = 0
     this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
     this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
+    this.playerAimTimer = 0; this.enemyAimBreakTimer = 0; this.enemyAimBreakCooldown = 0; this.enemyAimBreakDirection = 1
     this.playerCampTimer = 0; this.enemyFlankTimer = 0; this.enemyFlankCooldown = 0
     this.previousPlayerPosition.set(0, 0, 2.3); this.playerVelocity.set(0, 0, 0)
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
@@ -511,6 +516,17 @@ export class RooftopArena {
       this.playerVelocity.set(playerDeltaX / Math.max(dt, .001), 0, playerDeltaZ / Math.max(dt, .001))
       this.previousPlayerPosition.copy(this.player.position)
       this.enemyFlankCooldown = Math.max(0, this.enemyFlankCooldown - dt)
+      // Sustained ADS gives the rival a chance to read the player's commitment and break the sightline.
+      this.playerAimTimer = this.aiming ? this.playerAimTimer + dt : Math.max(0, this.playerAimTimer - dt * 2.2)
+      this.enemyAimBreakCooldown = Math.max(0, this.enemyAimBreakCooldown - dt)
+      this.enemyAimBreakTimer = Math.max(0, this.enemyAimBreakTimer - dt)
+      if (this.playerAimTimer > 1.65 && this.enemyAimBreakCooldown <= 0) {
+        this.enemyAimBreakTimer = this.roundNumber % 3 === 2 ? 1.35 : 1.05
+        this.enemyAimBreakCooldown = this.roundNumber % 3 === 2 ? 4.2 : 5.4
+        this.enemyAimBreakDirection = this.enemy.position.x >= this.player.position.x ? -1 : 1
+        this.enemyCovering = false; this.enemyPeeking = false; this.enemyPeekTimer = 0
+        this.playerAimTimer = 0
+      }
       if (this.isPlayerProtected() && playerDisplacement < .035) this.playerCampTimer += dt
       else this.playerCampTimer = Math.max(0, this.playerCampTimer - dt * 2.5)
       // Each round introduces a distinct rival doctrine so the duel evolves as the match progresses.
@@ -555,6 +571,8 @@ export class RooftopArena {
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyDodgeTimer > 0
         ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyDodgeDirection * 2.35, -4.1, 4.1)
+        : this.enemyAimBreakTimer > 0
+          ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyAimBreakDirection * 2.7, -5.2, 5.2)
         : this.enemyFlankTimer > 0
           ? this.enemyFlankSide * 5.25
           : this.enemyCovering
