@@ -26,6 +26,10 @@ export class RooftopArena {
   private enemyHitTimer = 0
   private crouched = false
   private peekDirection: -1 | 0 | 1 = 0
+  private readonly coverZones = [
+    { x: -5.6, z: -3.5, halfX: 1.4, halfZ: .55 },
+    { x: 5.2, z: 1.8, halfX: 1.2, halfZ: .6 }
+  ]
   private muzzleTimer = 0
   private tracer: THREE.Line | null = null
   private listener: StateListener
@@ -128,6 +132,18 @@ export class RooftopArena {
   peek(direction: -1 | 1) { this.peekDirection = this.peekDirection === direction ? 0 : direction }
   setTouchKey(key: string, pressed: boolean) { pressed ? this.touchKeys.add(key) : this.touchKeys.delete(key) }
   aim() { this.aiming = !this.aiming }
+  private blockedByCover(x: number, z: number) {
+    return this.coverZones.some(cover => Math.abs(x - cover.x) < cover.halfX + .42 && Math.abs(z - cover.z) < cover.halfZ + .42)
+  }
+  private isPlayerProtected() {
+    if (!this.crouched || this.peekDirection !== 0) return false
+    return this.coverZones.some(cover => {
+      const behindCover = this.player.position.z > cover.z + cover.halfZ
+      const closeEnough = this.player.position.z - (cover.z + cover.halfZ) < 2.8
+      const aligned = Math.abs(this.player.position.x - cover.x) < cover.halfX + .35
+      return behindCover && closeEnough && aligned
+    })
+  }
   shoot() {
     if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
@@ -187,10 +203,10 @@ export class RooftopArena {
       const moving = forward || back || left || right
       if (this.keys.has('KeyQ')) this.peekDirection = -1
       else if (this.keys.has('KeyE')) this.peekDirection = 1
-      if (forward) this.player.position.z -= speed
-      if (back) this.player.position.z += speed
-      if (left) this.player.position.x -= speed
-      if (right) this.player.position.x += speed
+      const nextX = this.player.position.x + (right ? speed : 0) - (left ? speed : 0)
+      const nextZ = this.player.position.z + (back ? speed : 0) - (forward ? speed : 0)
+      if (!this.blockedByCover(nextX, this.player.position.z)) this.player.position.x = nextX
+      if (!this.blockedByCover(this.player.position.x, nextZ)) this.player.position.z = nextZ
       if (moving) this.walkTime += dt * 10
       this.player.position.x = THREE.MathUtils.clamp(this.player.position.x, -6.8, 6.8)
       this.player.position.z = THREE.MathUtils.clamp(this.player.position.z, -1.8, 6.5)
@@ -220,7 +236,8 @@ export class RooftopArena {
       if (this.enemyTimer > 2.8 && this.enemyHealth > 0) {
         this.enemyTimer = 0
         if (Math.random() > .2) {
-          this.health = Math.max(0, this.health - (Math.random() > .5 ? 8 : 12))
+          const protectedByCover = this.isPlayerProtected()
+          if (!protectedByCover) this.health = Math.max(0, this.health - (Math.random() > .5 ? 8 : 12))
           this.flash(this.enemy); this.publish()
           if (this.health === 0) this.finish('DEFEAT')
         }
