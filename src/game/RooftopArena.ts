@@ -133,8 +133,8 @@ export class RooftopArena {
 
   private createFighter(jacket: string, pants: string) {
     const group = new THREE.Group()
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), this.material(jacket)); torso.position.y = 1.2; torso.castShadow = true; group.add(torso)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 8, 7), this.material('#c58f70')); head.position.y = 1.93; head.castShadow = true; group.add(head)
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), this.material(jacket)); torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 8, 7), this.material('#c58f70')); head.position.y = 1.93; head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
     const hood = new THREE.Mesh(new THREE.BoxGeometry(.57, .18, .5), this.material(pants)); hood.position.set(0, 2.08, -.03); group.add(hood)
     const legs: THREE.Mesh[] = []
     for (const x of [-.2, .2]) {
@@ -221,19 +221,27 @@ export class RooftopArena {
     const config = WEAPONS[this.weapon]
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
     let totalDamage = 0
+    let headHits = 0
+    this.enemy.updateMatrixWorld(true)
+    const raycaster = new THREE.Raycaster()
     for (let pellet = 0; pellet < config.pellets; pellet++) {
-      const isHead = Math.random() < (this.aiming ? .38 : .16) * (this.weapon === 'sniper' ? 1.45 : 1)
-      const target = new THREE.Vector3(); this.enemy.localToWorld(target.set((Math.random() - .5) * config.spread, isHead ? 1.96 : 1.2, 0))
+      const target = new THREE.Vector3(); this.enemy.localToWorld(target.set((Math.random() - .5) * .5, 1.05 + Math.random() * 1.15, 0))
       target.x += (Math.random() - .5) * (this.aiming ? .12 : config.spread)
       target.y += (Math.random() - .5) * (this.aiming ? .1 : config.spread * .55)
-      if (this.hasLineOfSight(origin, target) && !this.isEnemyProtected() && origin.distanceTo(target) > 0) {
+      const direction = target.clone().sub(origin).normalize()
+      raycaster.set(origin, direction)
+      raycaster.far = origin.distanceTo(target) + .65
+      const hit = raycaster.intersectObjects(this.enemy.children, true).find(item => item.object.userData.hitZone)
+      if (hit && this.hasLineOfSight(origin, hit.point) && !this.isEnemyProtected()) {
+        const isHead = hit.object.userData.hitZone === 'head'
         totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
+        if (isHead) headHits++
       }
     }
     if (totalDamage > 0) {
-      this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = .3
-      const impact = new THREE.Vector3(); this.enemy.localToWorld(impact.set((Math.random() - .5) * .38, 1.15 + Math.random() * .65, 0))
-      this.spawnImpact(impact, this.weapon === 'sniper' ? '#fff0b0' : '#ff9b54', this.weapon === 'shotgun' ? 12 : 7)
+      this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = headHits > 0 ? .48 : .3
+      const impact = new THREE.Vector3(); this.enemy.localToWorld(impact.set((Math.random() - .5) * .38, headHits > 0 ? 1.93 : 1.2, 0))
+      this.spawnImpact(impact, headHits > 0 ? '#fff0a0' : this.weapon === 'sniper' ? '#9fe8ff' : '#ff9b54', headHits > 0 ? 12 : this.weapon === 'shotgun' ? 12 : 7)
     }
     this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
     this.flash(this.player)
@@ -368,6 +376,7 @@ export class RooftopArena {
       const enemyTorso = this.enemy.userData.torso as THREE.Mesh
       ;(enemyTorso.material as THREE.MeshStandardMaterial).color.set(this.enemyHitTimer > 0 ? '#ffb0a0' : '#d64f48')
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
+      this.enemy.rotation.x = THREE.MathUtils.damp(this.enemy.rotation.x, this.enemyHitTimer > 0 ? -.09 : 0, 10, dt)
       const enemyBaseX = 1.4
       const enemyTargetX = this.enemyCovering ? 4.2 : enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
       const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
