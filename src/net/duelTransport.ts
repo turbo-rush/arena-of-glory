@@ -70,7 +70,7 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
       return isString(value.playerId) && isString(value.roomCode) && (value.slot === 1 || value.slot === 2)
         ? value as ServerDuelMessage : null
     case 'room_state':
-      return ['waiting', 'ready', 'fighting', 'finished'].includes(String(value.phase)) && Array.isArray(value.players)
+      return ['waiting', 'ready', 'fighting', 'round_break', 'finished'].includes(String(value.phase)) && Array.isArray(value.players)
         ? value as ServerDuelMessage : null
     case 'match_started':
       return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime)
