@@ -262,6 +262,7 @@ export class RooftopArena {
     this.remoteTargetYaw = this.enemy.rotation.y
     this.started = true
     this.gameStatus = 'FIGHT'
+    this.health = 100
     this.enemyHealth = 100
     this.publish()
   }
