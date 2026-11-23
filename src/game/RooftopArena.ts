@@ -30,7 +30,7 @@ export class RooftopArena {
   private tracer: THREE.Line | null = null
   private listener: StateListener
   private host: HTMLElement
-  private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload() }
+  private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload(); if (e.code === 'KeyC' && !e.repeat) this.crouch() }
   private onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); if (e.code === 'KeyQ' || e.code === 'KeyE') this.peekDirection = 0 }
   private resizeObserver: ResizeObserver
 
