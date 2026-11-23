@@ -349,7 +349,7 @@ export class RooftopArena {
     addBox(arm, .23, .1, .24, 0, -.43, .02, accent)
     const gun = new THREE.Group(); gun.position.set(.03, -.38, -.48); arm.add(gun)
     group.userData.weaponModel = gun
-    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' }))
+    const muzzle = new THREE.Mesh(new THREE.OctahedronGeometry(.13, 0), new THREE.MeshBasicMaterial({ color: '#ffb34f' }))
     muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
     group.userData.torso = torso
@@ -719,10 +719,19 @@ export class RooftopArena {
   }
 
   private spawnImpact(position: THREE.Vector3, color: string, count: number) {
+    // A quick expanding ink-ring makes confirmed hits readable even on small screens.
+    const ringMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false })
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.13, .025, 5, 12), ringMaterial)
+    ring.position.copy(position)
+    ring.quaternion.copy(this.camera.quaternion)
+    this.scene.add(ring)
+    this.impactParticles.push({ mesh: ring, velocity: new THREE.Vector3(), life: .22, maxLife: .22 })
+
     for (let i = 0; i < count; i++) {
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(.045 + Math.random() * .035, 5, 4), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }))
+      const size = .035 + Math.random() * .045
+      const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(size, 0), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }))
       mesh.position.copy(position); this.scene.add(mesh)
-      this.impactParticles.push({ mesh, velocity: new THREE.Vector3((Math.random() - .5) * 3.2, Math.random() * 2.6, (Math.random() - .5) * 2.2), life: .32 + Math.random() * .2, maxLife: .52 })
+      this.impactParticles.push({ mesh, velocity: new THREE.Vector3((Math.random() - .5) * 3.8, Math.random() * 3.1, (Math.random() - .5) * 2.6), life: .28 + Math.random() * .18, maxLife: .46 })
     }
   }
 
@@ -805,8 +814,10 @@ export class RooftopArena {
       for (let i = this.impactParticles.length - 1; i >= 0; i--) {
         const particle = this.impactParticles[i]
         particle.life -= dt
-        particle.velocity.y -= 5.5 * dt
+        const isImpactRing = particle.mesh.geometry.type === 'TorusGeometry'
+        if (!isImpactRing) particle.velocity.y -= 5.5 * dt
         particle.mesh.position.addScaledVector(particle.velocity, dt)
+        if (isImpactRing) particle.mesh.scale.setScalar(1 + (1 - particle.life / particle.maxLife) * 2.6)
         ;(particle.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, particle.life / particle.maxLife)
         if (particle.life <= 0) {
           this.scene.remove(particle.mesh); particle.mesh.geometry.dispose(); (particle.mesh.material as THREE.Material).dispose()
