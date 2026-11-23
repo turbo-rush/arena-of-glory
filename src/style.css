@@ -12,3 +12,43 @@
 
 /* Combat feedback: readable hit confirmation and brief incoming-damage pulse. */
 .hit-feedback{position:absolute;z-index:3;left:50%;top:43%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff1c8;text-shadow:0 2px 10px #000,0 0 18px #ff9c42;pointer-events:none;animation:hit-pop .62s ease-out both}.hit-feedback b{font:900 13px 'Barlow Condensed';letter-spacing:3px}.hit-crosshair{font-size:27px;line-height:1}.hit-feedback.is-headshot{color:#fff0a0;text-shadow:0 2px 10px #000,0 0 22px #ffcf4d}.hit-feedback.is-headshot b{font-size:17px;letter-spacing:4px}@keyframes hit-pop{0%{opacity:0;scale:.55}18%{opacity:1;scale:1.12}38%{scale:1}100%{opacity:0;translate:0 -18px}}.damage-flash{position:absolute;z-index:2;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 rgba(255,45,35,0);animation:damage-pulse .34s ease-out both}@keyframes damage-pulse{0%{box-shadow:inset 0 0 0 0 rgba(255,45,35,0)}25%{box-shadow:inset 0 0 90px 18px rgba(255,45,35,.42)}100%{box-shadow:inset 0 0 0 0 rgba(255,45,35,0)}}
+
+
+/* Private online duel lobby */
+.lobby-card{width:min(440px,90%);max-height:88vh;overflow:auto;margin-left:7%;justify-self:start;padding:26px 28px;background:rgba(9,14,23,.94);border:1px solid rgba(255,179,78,.38);box-shadow:0 18px 70px #0009;backdrop-filter:blur(12px)}
+.lobby-card h1{font:900 clamp(46px,7vw,68px)/.82 'Barlow Condensed';letter-spacing:-1px;margin:14px 0;text-shadow:0 4px 20px #0008}
+.lobby-card h1 em{font-style:normal;color:#ffb34e}
+.lobby-card>p{font-size:13px;line-height:1.4;color:#c7cbd1;margin:16px 0}
+.lobby-label,.room-code-label{display:block;margin:17px 0 6px;color:#ffca79;font-size:9px;font-weight:700;letter-spacing:2px}
+.lobby-input{width:100%;height:39px;padding:0 11px;color:#fff;background:#151e2a;border:1px solid #ffffff38;border-radius:0;outline:none;font:700 12px 'Rajdhani';letter-spacing:1px}
+.lobby-input:focus{border-color:#ffb34e}
+.lobby-primary{display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:13px;padding:12px 15px;background:#f2a33e;color:#151820;border:0;font:900 13px 'Barlow Condensed';letter-spacing:1.5px;box-shadow:4px 4px 0 #713e28}
+.lobby-primary span{font-size:18px}
+.lobby-primary:disabled,.lobby-join button:disabled{opacity:.45;cursor:not-allowed}
+.lobby-divider{display:flex;align-items:center;gap:10px;margin:15px 0;color:#87909c;font-size:8px;letter-spacing:2px}
+.lobby-divider:before,.lobby-divider:after{content:'';height:1px;flex:1;background:#ffffff24}
+.lobby-join{display:flex;gap:7px}
+.lobby-join button,.room-code button{min-width:70px;background:#252f3d;border:1px solid #ffffff35;color:#ffca79;font:800 11px 'Barlow Condensed';letter-spacing:1.2px}
+.code-input{text-transform:uppercase;letter-spacing:3px}
+.room-status{margin-top:13px}
+.room-status-line{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.5px;color:#d9dde2}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#70d69a;box-shadow:0 0 9px #70d69a}
+.status-dot.connecting{background:#ffb34e;box-shadow:0 0 9px #ffb34e;animation:status-blink .8s infinite alternate}
+@keyframes status-blink{to{opacity:.35}}
+.room-code{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#151e2a;border:1px solid #ffffff2c}
+.room-code strong{font:900 27px 'Barlow Condensed';letter-spacing:7px;color:#ffca79}
+.room-code button{padding:7px 10px}
+.room-player-list{margin-top:12px;border-top:1px solid #ffffff24}
+.room-player{display:flex;align-items:center;gap:10px;padding:9px 3px;border-bottom:1px solid #ffffff1b}
+.player-slot{display:grid;place-items:center;width:27px;height:27px;border:1px solid #ffb34e77;color:#ffca79;font:800 13px 'Barlow Condensed'}
+.room-player div{flex:1;min-width:0}
+.room-player b,.room-player small{display:block}
+.room-player b{font:700 11px 'Barlow Condensed';letter-spacing:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.room-player small{margin-top:2px;color:#929ba7;font-size:8px;letter-spacing:1.2px}
+.room-player i{font-style:normal;color:#89929e;font-weight:800}
+.room-player i.player-ready{color:#70d69a}
+.lobby-note{font-size:10px!important;color:#aab2bd!important;line-height:1.45!important;margin:12px 0!important}
+.lobby-secondary{width:100%;padding:9px;background:transparent;border:1px solid #ffffff35;color:#bfc5ce;font:800 10px 'Barlow Condensed';letter-spacing:1.5px}
+.lobby-error{margin-top:10px;padding:8px 10px;background:#662c2c66;border-left:2px solid #ef665b;color:#ffc1ba;font-size:11px}
+.lobby-footnote{display:block;margin-top:17px;color:#89929e;font-size:8px;letter-spacing:1.7px}
+@media(max-width:600px){.lobby-card{width:92%;max-height:82vh;margin-left:0;justify-self:center;padding:20px}.lobby-card h1{font-size:52px}.lobby-card>p{font-size:12px}.lobby-input{height:36px}.room-code strong{font-size:24px}.start-overlay{background:rgba(5,9,15,.65)}}
