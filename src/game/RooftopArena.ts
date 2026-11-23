@@ -62,7 +62,7 @@ export class RooftopArena {
     // Distant city skyline
     for (let i = 0; i < 38; i++) {
       const x = (i % 10 - 5) * 8 + Math.sin(i * 4) * 2
-      const z = -18 - Math.floor(i / 10) * 15
+      const z = -36 - Math.floor(i / 10) * 15
       const h = 5 + (i * 13 % 17)
       const b = this.box(this.scene, x, h / 2 - 3, z, 4 + i % 3, h, 4, i % 3 ? '#555966' : '#6c6265')
       const windows = new THREE.Mesh(new THREE.BoxGeometry(0.12, h * .72, 0.08), new THREE.MeshBasicMaterial({ color: i % 2 ? '#e7bd83' : '#7d9ba9' }))
@@ -78,7 +78,7 @@ export class RooftopArena {
     this.box(roof, -5.6, .75, -3.5, 2.8, 1.5, 1.1, '#59636e')
     this.box(roof, 5.2, .65, 1.8, 2.4, 1.3, 1.2, '#59636e')
     // Enemy rooftop
-    const far = new THREE.Group(); far.position.set(0, 0, -23); this.scene.add(far)
+    const far = new THREE.Group(); far.position.set(0, 0, -12.5); this.scene.add(far)
     this.box(far, 0, -0.45, 0, 15, .9, 12, '#383d49')
     this.box(far, -7.2, .1, 0, .5, 1.3, 12, '#656a72')
     this.box(far, 7.2, .1, 0, .5, 1.3, 12, '#656a72')
@@ -91,7 +91,7 @@ export class RooftopArena {
     this.enemy.position.set(1.4, 0, -2.5); far.add(this.enemy)
     // Camera follows just behind the player, looking toward the rival rooftop.
     this.camera.position.set(0, 5.6, 12.5)
-    this.camera.lookAt(0, 1.2, -9)
+    this.camera.lookAt(0, 1.2, -13)
   }
 
   private createFighter(jacket: string, pants: string) {
@@ -169,7 +169,7 @@ export class RooftopArena {
       }
     }
     this.camera.position.x += (this.player.position.x * .24 - this.camera.position.x) * .035
-    this.camera.lookAt(this.player.position.x * .12, 1.2, -9)
+    this.camera.lookAt(this.player.position.x * .12, 1.2, -13)
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
