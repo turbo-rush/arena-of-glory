@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
-export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string; hitFeedback: 'HEADSHOT' | 'HIT' | ''; hitFeedbackId: number; damageFlashId: number }
+export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string; hitFeedback: 'HEADSHOT' | 'HIT' | 'EXPLOSION' | ''; hitFeedbackId: number; damageFlashId: number }
 type StateListener = (state: GameState) => void
 const WEAPONS: Record<WeaponId, { name: string; subtitle: string; magazine: number; reserve: number; damage: number; headMultiplier: number; spread: number; pellets: number }> = {
   pistol: { name: 'VX-9 SIDEARM', subtitle: 'SEMI-AUTO // 9MM', magazine: 12, reserve: 48, damage: 18, headMultiplier: 2.2, spread: .42, pellets: 1 },
@@ -68,6 +68,9 @@ export class RooftopArena {
   private sun!: THREE.DirectionalLight
   private hemisphere!: THREE.HemisphereLight
   private arenaLandmarks: THREE.Group[] = []
+  private explosiveBarrel!: THREE.Group
+  private explosionVisual: THREE.Mesh | null = null
+  private explosionTimer = 0
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -166,6 +169,17 @@ export class RooftopArena {
     this.box(far, 0, .1, -5.8, 15, 1.3, .5, '#656a72')
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
+    // A marked explosive barrel sits in the firing lane between rooftops.
+    this.explosiveBarrel = new THREE.Group()
+    const barrelBody = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, 1.25, 10), this.material('#b84b35', .55))
+    barrelBody.position.y = .68; barrelBody.castShadow = true; barrelBody.userData.explosive = true; this.explosiveBarrel.add(barrelBody)
+    for (const y of [.28, 1.02]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, .11, 10), this.material('#343b43', .4))
+      band.position.y = y; band.castShadow = true; band.userData.explosive = true; this.explosiveBarrel.add(band)
+    }
+    const warning = new THREE.Mesh(new THREE.BoxGeometry(.5, .28, .035), new THREE.MeshBasicMaterial({ color: '#ffd36b' }))
+    warning.position.set(0, .72, .485); warning.userData.explosive = true; this.explosiveBarrel.add(warning)
+    this.explosiveBarrel.position.set(1.4, 0, 1.0); far.add(this.explosiveBarrel)
     this.player = this.createFighter('#e5a23b', '#263342')
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('#d64f48', '#20232d')
@@ -257,6 +271,9 @@ export class RooftopArena {
   private resetRoundState() {
     this.health = 100; this.enemyHealth = 100
     this.hitFeedback = ''; this.hitFeedbackTimer = 0
+    this.explosiveBarrel.visible = true
+    if (this.explosionVisual) { this.scene.remove(this.explosionVisual); this.explosionVisual.geometry.dispose(); (this.explosionVisual.material as THREE.Material).dispose(); this.explosionVisual = null }
+    this.explosionTimer = 0
     this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
     this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
     this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.reloadTimer = 0
@@ -313,6 +330,7 @@ export class RooftopArena {
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
     let totalDamage = 0
     let headHits = 0
+    let barrelTriggered = false
     this.enemy.updateMatrixWorld(true)
     const raycaster = new THREE.Raycaster()
     for (let pellet = 0; pellet < config.pellets; pellet++) {
@@ -326,13 +344,16 @@ export class RooftopArena {
       const direction = target.clone().sub(origin).normalize()
       raycaster.set(origin, direction)
       raycaster.far = origin.distanceTo(target) + .65
-      const hit = raycaster.intersectObjects(this.enemy.children, true).find(item => item.object.userData.hitZone)
-      if (hit && this.hasLineOfSight(origin, hit.point) && !this.isEnemyProtected()) {
+      const targets = this.explosiveBarrel.visible ? [this.enemy, this.explosiveBarrel] : [this.enemy]
+      const hit = raycaster.intersectObjects(targets, true)[0]
+      if (hit && hit.object.userData.explosive) { barrelTriggered = true; break }
+      if (hit && hit.object.userData.hitZone && this.hasLineOfSight(origin, hit.point) && !this.isEnemyProtected()) {
         const isHead = hit.object.userData.hitZone === 'head'
         totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
         if (isHead) headHits++
       }
     }
+    if (barrelTriggered) this.detonateBarrel()
     if (totalDamage > 0) {
       this.hitFeedback = headHits > 0 ? 'HEADSHOT' : 'HIT'
       this.hitFeedbackId++
@@ -347,6 +368,24 @@ export class RooftopArena {
     this.publish()
     if (this.enemyHealth === 0) this.finish('VICTORY')
   }
+  private detonateBarrel() {
+    if (!this.explosiveBarrel.visible) return
+    this.explosiveBarrel.visible = false
+    const center = new THREE.Vector3(); this.explosiveBarrel.getWorldPosition(center); center.y += .7
+    const blast = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshBasicMaterial({ color: '#ff9a42', transparent: true, opacity: .78, depthWrite: false }))
+    blast.position.copy(center); blast.scale.setScalar(.5); this.scene.add(blast)
+    this.explosionVisual = blast; this.explosionTimer = .48
+    this.spawnImpact(center, '#ffd36b', 30)
+    const playerPosition = new THREE.Vector3(); this.player.getWorldPosition(playerPosition); playerPosition.y += 1
+    const enemyPosition = new THREE.Vector3(); this.enemy.getWorldPosition(enemyPosition); enemyPosition.y += 1
+    if (center.distanceTo(playerPosition) < 6.2) { this.health = Math.max(0, this.health - 38); this.damageFlashId++; this.spawnImpact(playerPosition, '#ff805e', 8) }
+    if (center.distanceTo(enemyPosition) < 6.2) { this.enemyHealth = Math.max(0, this.enemyHealth - 42); this.enemyHitTimer = .55; this.spawnImpact(enemyPosition, '#ffb36b', 10) }
+    this.hitFeedback = 'EXPLOSION'; this.hitFeedbackId++; this.hitFeedbackTimer = .85
+    this.publish()
+    if (this.health === 0) this.finish('DEFEAT')
+    else if (this.enemyHealth === 0) this.finish('VICTORY')
+  }
+
   private flash(fighter: THREE.Group) {
     const muzzle = fighter.userData.muzzle as THREE.Mesh
     muzzle.visible = true
@@ -429,6 +468,16 @@ export class RooftopArena {
     if (this.hitFeedbackTimer > 0) {
       this.hitFeedbackTimer = Math.max(0, this.hitFeedbackTimer - dt)
       if (this.hitFeedbackTimer === 0 && this.hitFeedback) { this.hitFeedback = ''; this.publish() }
+    }
+    if (this.explosionVisual && this.explosionTimer > 0) {
+      this.explosionTimer = Math.max(0, this.explosionTimer - dt)
+      const progress = 1 - this.explosionTimer / .48
+      this.explosionVisual.scale.setScalar(.5 + progress * 5.2)
+      ;(this.explosionVisual.material as THREE.MeshBasicMaterial).opacity = Math.max(0, this.explosionTimer / .48) * .78
+      if (this.explosionTimer === 0) {
+        this.scene.remove(this.explosionVisual); this.explosionVisual.geometry.dispose()
+        ;(this.explosionVisual.material as THREE.Material).dispose(); this.explosionVisual = null
+      }
     }
     if (this.impactParticles.length) {
       for (let i = this.impactParticles.length - 1; i >= 0; i--) {
