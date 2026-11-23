@@ -26,6 +26,14 @@ export class RooftopArena {
   private enemyHitTimer = 0
   private crouched = false
   private peekDirection: -1 | 0 | 1 = 0
+  private enemyCovering = false
+  private enemyCoverTimer = 0
+  private readonly coverColliders = [
+    new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
+    new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
+    new THREE.Box3(new THREE.Vector3(-5.75, 0, -11.1), new THREE.Vector3(-3.25, 1.65, -9.9)),
+    new THREE.Box3(new THREE.Vector3(2.95, 0, -14.9), new THREE.Vector3(5.45, 1.45, -13.7))
+  ]
   private readonly coverZones = [
     { x: -5.6, z: -3.5, halfX: 1.4, halfZ: .55 },
     { x: 5.2, z: 1.8, halfX: 1.2, halfZ: .6 }
@@ -135,6 +143,21 @@ export class RooftopArena {
   private blockedByCover(x: number, z: number) {
     return this.coverZones.some(cover => Math.abs(x - cover.x) < cover.halfX + .42 && Math.abs(z - cover.z) < cover.halfZ + .42)
   }
+  private hasLineOfSight(from: THREE.Vector3, to: THREE.Vector3) {
+    const direction = to.clone().sub(from)
+    const distance = direction.length()
+    direction.normalize()
+    const ray = new THREE.Ray(from, direction)
+    return !this.coverColliders.some(box => {
+      const point = ray.intersectBox(box, new THREE.Vector3())
+      return point !== null && point.distanceTo(from) < distance - .45
+    })
+  }
+  private isEnemyProtected() {
+    if (!this.enemyCovering) return false
+    const p = new THREE.Vector3(); this.enemy.getWorldPosition(p)
+    return p.z < -14.8 && Math.abs(p.x - 4.2) < 1.15
+  }
   private isPlayerProtected() {
     if (!this.crouched || this.peekDirection !== 0) return false
     return this.coverZones.some(cover => {
@@ -147,7 +170,11 @@ export class RooftopArena {
   shoot() {
     if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
-    const hit = Math.random() > (this.aiming ? .08 : .24)
+    const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
+    const target = new THREE.Vector3(); this.enemy.localToWorld(target.set(0, 1.2, 0))
+    target.x += (Math.random() - .5) * (this.aiming ? .22 : .7)
+    target.y += (Math.random() - .5) * (this.aiming ? .18 : .55)
+    const hit = this.hasLineOfSight(origin, target) && origin.distanceTo(target) > 0
     if (hit) { this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 25 : 16)); this.enemyHitTimer = .3 }
     this.recoil = 1
     this.flash(this.player)
@@ -221,24 +248,33 @@ export class RooftopArena {
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
+      this.enemyCoverTimer += dt
+      if (this.enemyCoverTimer > 5.2) { this.enemyCoverTimer = 0; this.enemyCovering = !this.enemyCovering }
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
       const enemyTorso = this.enemy.userData.torso as THREE.Mesh
       ;(enemyTorso.material as THREE.MeshStandardMaterial).color.set(this.enemyHitTimer > 0 ? '#ffb0a0' : '#d64f48')
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       const enemyBaseX = 1.4
-      this.enemy.position.x = enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
+      const enemyTargetX = this.enemyCovering ? 4.2 : enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
+      const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
+      this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 2.8, dt)
+      this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 2.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
       enemyLegs.forEach((leg, index) => { leg.rotation.x = Math.sin(this.enemyWalkTime * 4 + index * Math.PI) * .22 })
       this.enemy.rotation.y = Math.PI
-      this.enemy.position.y = Math.abs(Math.sin(this.enemyWalkTime * 2)) * .035
+      this.enemy.position.y = this.enemyCovering ? -.32 : Math.abs(Math.sin(this.enemyWalkTime * 2)) * .035
       this.enemy.userData.arm.rotation.x = THREE.MathUtils.damp(this.enemy.userData.arm.rotation.x, 0, 8, dt)
       this.enemyTimer += dt
       if (this.enemyTimer > 2.8 && this.enemyHealth > 0) {
         this.enemyTimer = 0
         if (Math.random() > .2) {
           const protectedByCover = this.isPlayerProtected()
-          if (!protectedByCover) this.health = Math.max(0, this.health - (Math.random() > .5 ? 8 : 12))
-          this.flash(this.enemy); this.publish()
+          const enemyOrigin = new THREE.Vector3(); this.enemy.localToWorld(enemyOrigin.set(.46, 1.04, .35))
+          const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, 1.2, 0))
+          const clearShot = this.hasLineOfSight(enemyOrigin, playerTarget)
+          if (!protectedByCover && clearShot && !this.isEnemyProtected()) this.health = Math.max(0, this.health - (Math.random() > .5 ? 8 : 12))
+          if (!this.isEnemyProtected()) this.flash(this.enemy)
+          this.publish()
           if (this.health === 0) this.finish('DEFEAT')
         }
       }
