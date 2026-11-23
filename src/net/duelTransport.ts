@@ -30,6 +30,8 @@ export type ServerDuelMessage =
   | { type: 'welcome'; playerId: string; roomCode: string; slot: 1 | 2 }
   | { type: 'room_state'; phase: DuelPhase; players: { playerId: string; displayName: string; ready: boolean; connected: boolean }[] }
   | { type: 'match_started'; arenaId: string; seed: number; serverTime: number }
+  | { type: 'input'; input: DuelInput }
+  | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
   | { type: 'snapshot'; serverTick: number; ackInputSeq: number; players: { playerId: string; x: number; y: number; z: number; yaw: number; health: number; ammo: number; weapon: WeaponId; alive: boolean }[] }
   | { type: 'shot_result'; shotId: number; shooterId: string; hitPlayerId: string | null; hitZone: HitZone | null; damage: number; targetHealth: number | null; accepted: boolean }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
@@ -69,6 +71,18 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
         ? value as ServerDuelMessage : null
     case 'match_started':
       return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime)
+        ? value as ServerDuelMessage : null
+    case 'input': {
+      if (!isRecord(value.input)) return null
+      const input = value.input
+      return isNumber(input.seq) && isNumber(input.clientTime) && isNumber(input.moveX) &&
+        isNumber(input.moveZ) && isNumber(input.lookYaw) && isNumber(input.lookPitch) &&
+        typeof input.crouched === 'boolean' && typeof input.aiming === 'boolean'
+        ? value as ServerDuelMessage : null
+    }
+    case 'fire':
+      return isNumber(value.shotId) && isWeapon(value.weapon) &&
+        isNumber(value.aimYaw) && isNumber(value.aimPitch)
         ? value as ServerDuelMessage : null
     case 'snapshot':
       return isNumber(value.serverTick) && isNumber(value.ackInputSeq) && Array.isArray(value.players)
