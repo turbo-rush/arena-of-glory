@@ -1,7 +1,7 @@
 export const DUEL_PROTOCOL_VERSION = 1 as const
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
-export type DuelPhase = 'waiting' | 'ready' | 'fighting' | 'finished'
+export type DuelPhase = 'waiting' | 'ready' | 'fighting' | 'round_break' | 'finished'
 export type HitZone = 'head' | 'body'
 
 export type DuelInput = {
