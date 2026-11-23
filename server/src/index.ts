@@ -61,7 +61,7 @@ export default {
 }
 
 type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -91,7 +91,7 @@ export class DuelRoom {
       const slot = (this.players.size + 1) as 1 | 2
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, shotTimes: {}, lastShotId: 0 })
+      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
       server.serializeAttachment({ playerId, name, slot, ready: false, shotTimes: {}, lastShotId: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
       this.updatePhase()
@@ -131,9 +131,30 @@ export class DuelRoom {
         }
         break
       }
-      case "input":
-        if (this.phase === "fighting") this.broadcast(message, socket)
+      case "input": {
+        if (this.phase !== "fighting") break
+        const input = message.input
+        if (!input || typeof input !== "object" || Array.isArray(input)) break
+        const state = input as Record<string, unknown>
+        const valid = Number.isSafeInteger(state.seq) && Number(state.seq) > player.lastInputSeq &&
+          Number.isFinite(state.clientTime) &&
+          Number.isFinite(state.moveX) && Number(state.moveX) >= -6.8 && Number(state.moveX) <= 6.8 &&
+          Number.isFinite(state.moveZ) && Number(state.moveZ) >= -1.8 && Number(state.moveZ) <= 6.5 &&
+          Number.isFinite(state.lookYaw) && Math.abs(Number(state.lookYaw)) <= Math.PI * 4 &&
+          Number.isFinite(state.lookPitch) && Math.abs(Number(state.lookPitch)) <= Math.PI / 2 &&
+          typeof state.crouched === "boolean" && typeof state.aiming === "boolean"
+        if (!valid) break
+        player.lastInputSeq = Number(state.seq)
+        const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
+        socket.serializeAttachment({ ...(attachment ?? {}), lastInputSeq: player.lastInputSeq })
+        this.broadcast({ type: "input", input: {
+          seq: player.lastInputSeq, clientTime: Date.now(),
+          moveX: Number(state.moveX), moveZ: Number(state.moveZ),
+          lookYaw: Number(state.lookYaw), lookPitch: Number(state.lookPitch),
+          crouched: state.crouched, aiming: state.aiming,
+        } }, socket)
         break
+      }
       case "fire": {
         if (this.phase !== "fighting") break
         const weapon = message.weapon
@@ -192,7 +213,7 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
@@ -201,6 +222,7 @@ export class DuelRoom {
         socket,
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
+        lastInputSeq: attachment.lastInputSeq ?? 0,
       })
     }
     this.updatePhase()
