@@ -58,6 +58,11 @@ export class RooftopArena {
   private enemyShotWindup = 0
   private enemyDodgeTimer = 0
   private enemyDodgeDirection = 1
+  private playerCampTimer = 0
+  private enemyFlankTimer = 0
+  private enemyFlankCooldown = 0
+  private enemyFlankSide = 1
+  private previousPlayerPosition = new THREE.Vector3(0, 0, 2.3)
   private roundsWon = 0
   private roundsLost = 0
   private roundNumber = 1
@@ -265,6 +270,8 @@ export class RooftopArena {
     this.aiming = false; this.crouched = false; this.peekDirection = 0
     this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
     this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
+    this.playerCampTimer = 0; this.enemyFlankTimer = 0; this.enemyFlankCooldown = 0
+    this.previousPlayerPosition.set(0, 0, 2.3)
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
     this.recoil = 0; this.player.position.set(0, 0, 2.3); this.enemy.position.set(1.4, 0, -1.7)
     this.player.rotation.set(0, Math.PI, 0); this.enemy.rotation.set(0, Math.PI, 0)
@@ -497,6 +504,20 @@ export class RooftopArena {
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * recoilKick
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
+      const playerDisplacement = Math.hypot(this.player.position.x - this.previousPlayerPosition.x, this.player.position.z - this.previousPlayerPosition.z)
+      this.previousPlayerPosition.copy(this.player.position)
+      this.enemyFlankCooldown = Math.max(0, this.enemyFlankCooldown - dt)
+      if (this.isPlayerProtected() && playerDisplacement < .035) this.playerCampTimer += dt
+      else this.playerCampTimer = Math.max(0, this.playerCampTimer - dt * 2.5)
+      if (this.playerCampTimer > 3.8 && this.enemyFlankCooldown <= 0) {
+        // Punish prolonged passive cover play by rotating to the opposite rooftop angle.
+        this.enemyFlankTimer = 2.9
+        this.enemyFlankCooldown = 8.5
+        this.enemyFlankSide = this.player.position.x >= 0 ? -1 : 1
+        this.playerCampTimer = 0
+        this.enemyCovering = false; this.enemyPeeking = false; this.enemyPeekTimer = 0
+      }
+      this.enemyFlankTimer = Math.max(0, this.enemyFlankTimer - dt)
       this.enemyCoverTimer += dt
       const coverDecisionInterval = this.enemyHealth < 60 ? 2.9 : 3.8
       if (this.enemyCoverTimer > coverDecisionInterval) {
@@ -523,9 +544,11 @@ export class RooftopArena {
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyDodgeTimer > 0
         ? THREE.MathUtils.clamp(this.enemy.position.x + this.enemyDodgeDirection * 2.35, -4.1, 4.1)
-        : this.enemyCovering
-          ? (this.enemyPeeking ? 5.65 : 4.2)
-          : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
+        : this.enemyFlankTimer > 0
+          ? this.enemyFlankSide * 5.25
+          : this.enemyCovering
+            ? (this.enemyPeeking ? 5.65 : 4.2)
+            : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
