@@ -89,6 +89,7 @@ export default function App() {
         setRoomPhase('idle')
         gameRef.current?.stopOnline()
         setStarted(false)
+        setRoomError('Соединение с сервером потеряно. Матч остановлен — подключитесь к комнате заново.')
       }
     })
     try {
