@@ -52,13 +52,13 @@ export default function App() {
         <button className="reload-btn" onClick={reload} aria-label="Перезарядить"><RotateCcw size={17}/></button>
       </div>
 
-      <div className="controls-hint"><span>W A S D</span> MOVE <span>SPACE</span> DODGE</div>
+      <div className="controls-hint"><span>W A S D</span> MOVE <span>C</span> CROUCH <span>Q / E</span> PEEK</div>
       <div className="touch-controls">
         <div className="dpad">
           <button onTouchStart={() => move('KeyW', true)} onTouchEnd={() => move('KeyW', false)} onMouseDown={() => move('KeyW', true)} onMouseUp={() => move('KeyW', false)}>▲</button>
           <div><button onTouchStart={() => move('KeyA', true)} onTouchEnd={() => move('KeyA', false)} onMouseDown={() => move('KeyA', true)} onMouseUp={() => move('KeyA', false)}>◀</button><button onTouchStart={() => move('KeyS', true)} onTouchEnd={() => move('KeyS', false)} onMouseDown={() => move('KeyS', true)} onMouseUp={() => move('KeyS', false)}>▼</button><button onTouchStart={() => move('KeyD', true)} onTouchEnd={() => move('KeyD', false)} onMouseDown={() => move('KeyD', true)} onMouseUp={() => move('KeyD', false)}>▶</button></div>
         </div>
-        <div className="action-buttons"><button className="aim-btn" onClick={() => gameRef.current?.aim()}><Crosshair size={20}/><small>AIM</small></button><button className="fire-btn" onTouchStart={fire} onMouseDown={fire}><Zap size={25}/><small>FIRE</small></button></div>
+        <div className="action-buttons"><button className="stance-btn" onClick={() => gameRef.current?.crouch()}><span>↓</span><small>CROUCH</small></button><button className="stance-btn" onClick={() => gameRef.current?.peek(-1)}><span>↶</span><small>PEEK</small></button><button className="aim-btn" onClick={() => gameRef.current?.aim()}><Crosshair size={20}/><small>AIM</small></button><button className="fire-btn" onTouchStart={fire} onMouseDown={fire}><Zap size={25}/><small>FIRE</small></button></div>
       </div>
 
       {!started && <div className="start-overlay"><div className="start-card"><div className="eyebrow">THE CITY IS YOUR BATTLEFIELD</div><h1>OWN THE<br/><em>ROOFTOPS.</em></h1><p>One opponent. One rooftop. No second chances.</p><button onClick={() => { setStarted(true); gameRef.current?.start() }}>ENTER THE ARENA <span>→</span></button><small>PROTOTYPE BUILD 0.1 // TRAINING MATCH</small></div></div>}
