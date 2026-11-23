@@ -582,10 +582,21 @@ export class RooftopArena {
           const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, this.crouched ? .78 : 1.2, 0))
           const clearShot = this.hasLineOfSight(enemyOrigin, playerTarget)
           if (!protectedByCover && clearShot && !this.isEnemyProtected()) {
-            const baseDamage = this.enemyHealth < 45 ? 13 : 10
-            this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 4 : baseDamage))
-            this.damageFlashId++
-            this.spawnImpact(playerTarget, '#ff805e', 5)
+            // Movement and active peeking are meaningful defensive actions, not just animation.
+            const playerEvading = playerDisplacement > .035 || this.peekDirection !== 0
+            const hitChance = playerEvading ? (this.crouched ? .48 : .58) : .88
+            if (Math.random() < hitChance) {
+              const baseDamage = this.enemyHealth < 45 ? 13 : 10
+              this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 4 : baseDamage))
+              this.damageFlashId++
+              this.spawnImpact(playerTarget, '#ff805e', 5)
+            } else {
+              // A missed burst still gives visual feedback without damaging the player.
+              const missPoint = playerTarget.clone()
+              missPoint.x += (Math.random() - .5) * (playerEvading ? 2.2 : 1.1)
+              missPoint.y += (Math.random() - .5) * .8
+              this.spawnImpact(missPoint, '#ffb080', 3)
+            }
           }
           if (!this.isEnemyProtected()) this.flash(this.enemy)
           this.publish()
