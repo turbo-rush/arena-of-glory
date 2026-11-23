@@ -23,7 +23,7 @@ export default function App() {
   return (
     <main className="game-shell">
       {state.damageFlashId > 0 && <div key={state.damageFlashId} className="damage-flash" />}
-      {state.hitFeedback && <div key={state.hitFeedbackId} className={`hit-feedback${state.hitFeedback === 'HEADSHOT' ? ' is-headshot' : ''}`}><span className="hit-crosshair">✣</span><b>{state.hitFeedback}</b></div>}
+      {state.hitFeedback && <div key={state.hitFeedbackId} className={`hit-feedback${state.hitFeedback === 'HEADSHOT' ? ' is-headshot' : state.hitFeedback === 'EXPLOSION' ? ' is-explosion' : ''}`}><span className="hit-crosshair">✣</span><b>{state.hitFeedback}</b></div>}
       <div className="scene" ref={mountRef} />
       <div className="vignette" />
       <header className="topbar">
