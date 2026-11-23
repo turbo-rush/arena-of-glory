@@ -367,7 +367,7 @@ export class RooftopArena {
     const accent = this.material('#ff8b45', .42)
     const glow = new THREE.MeshBasicMaterial({ color: '#ffc36a' })
     const grip = this.material('#111820', .92)
-    const addPart = (w: number, h: number, d: number, x: number, y: number, z: number, material = dark, bevel = false) => {
+    const addPart = (w: number, h: number, d: number, x: number, y: number, z: number, material: THREE.Material = dark, bevel = false) => {
       const geometry = bevel
         ? new THREE.BoxGeometry(w, h, d, 1, 1, 1)
         : new THREE.BoxGeometry(w, h, d)
