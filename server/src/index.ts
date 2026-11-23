@@ -306,12 +306,14 @@ export class DuelRoom {
       player.pitch = 0
       player.shotTimes = {}
       const attachment = player.socket.deserializeAttachment() as Record<string, unknown> | null
-      player.socket.serializeAttachment({ ...(attachment ?? {}), health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {} })
+      player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {} })
     }
+    this.broadcastRoomState()
   }
 
   private updatePhase(): void {
     if (this.players.size < 2) this.phase = "waiting"
+    else if (this.phase === "round_break" || this.phase === "finished") return
     else this.phase = [...this.players.values()].every(player => player.ready) ? "fighting" : "ready"
   }
 
