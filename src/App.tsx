@@ -85,19 +85,30 @@ export default function App() {
     })
     transport.onStateChange(connection => {
       if (connection === 'connecting') setRoomPhase('connecting')
+      if (connection === 'connected') setRoomError('')
       if (connection === 'disconnected') {
-        setRoomPhase('idle')
-        gameRef.current?.stopOnline()
-        setStarted(false)
-        setRoomError('Соединение с сервером потеряно. Матч остановлен — подключитесь к комнате заново.')
+        if (transport.reconnecting) {
+          setRoomPhase('connecting')
+          setRoomError('Связь потеряна. Восстанавливаем подключение к матчу…')
+        } else {
+          setRoomPhase('idle')
+          gameRef.current?.stopOnline()
+          setStarted(false)
+          setRoomError('Не удалось восстановить соединение. Попробуйте снова войти в комнату.')
+        }
       }
     })
     try {
       await transport.connect()
       setRoomPhase('waiting')
     } catch (error) {
-      setRoomPhase('idle')
-      setRoomError(error instanceof Error ? error.message : 'Unable to connect')
+      if (!transport.reconnecting) {
+        setRoomPhase('idle')
+        setRoomError(error instanceof Error ? error.message : 'Unable to connect')
+      } else {
+        setRoomPhase('connecting')
+        setRoomError('Сервер временно недоступен. Повторяем подключение…')
+      }
     }
   }
 
