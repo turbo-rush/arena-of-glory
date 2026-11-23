@@ -135,7 +135,7 @@ export class RooftopArena {
     const group = new THREE.Group()
     const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), this.material(jacket)); torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
     const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 8, 7), this.material('#c58f70')); head.position.y = 1.93; head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(.57, .18, .5), this.material(pants)); hood.position.set(0, 2.08, -.03); group.add(hood)
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(.57, .18, .5), this.material(pants)); hood.position.set(0, 2.08, -.03); hood.userData.hitZone = 'head'; group.add(hood)
     const legs: THREE.Mesh[] = []
     for (const x of [-.2, .2]) {
       const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), this.material(pants)); leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
@@ -225,9 +225,13 @@ export class RooftopArena {
     this.enemy.updateMatrixWorld(true)
     const raycaster = new THREE.Raycaster()
     for (let pellet = 0; pellet < config.pellets; pellet++) {
-      const target = new THREE.Vector3(); this.enemy.localToWorld(target.set((Math.random() - .5) * .5, 1.05 + Math.random() * 1.15, 0))
-      target.x += (Math.random() - .5) * (this.aiming ? .12 : config.spread)
-      target.y += (Math.random() - .5) * (this.aiming ? .1 : config.spread * .55)
+      const target = new THREE.Vector3()
+      // Aim mode deliberately centers shots on the head; hip-fire favors the torso.
+      const targetHeight = this.aiming ? 1.93 : 1.2
+      const horizontalSpread = this.aiming ? .12 : config.spread
+      const verticalSpread = this.aiming ? .1 : config.spread * .55
+      this.enemy.localToWorld(target.set((Math.random() - .5) * (this.aiming ? .12 : .5), targetHeight + (Math.random() - .5) * verticalSpread, 0))
+      target.x += (Math.random() - .5) * horizontalSpread
       const direction = target.clone().sub(origin).normalize()
       raycaster.set(origin, direction)
       raycaster.far = origin.distanceTo(target) + .65
