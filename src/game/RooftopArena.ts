@@ -63,6 +63,7 @@ export class RooftopArena {
   private ground!: THREE.Mesh
   private sun!: THREE.DirectionalLight
   private hemisphere!: THREE.HemisphereLight
+  private arenaLandmarks: THREE.Group[] = []
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -124,6 +125,26 @@ export class RooftopArena {
       const windows = new THREE.Mesh(new THREE.BoxGeometry(0.12, h * .72, 0.08), new THREE.MeshBasicMaterial({ color: i % 2 ? '#e7bd83' : '#7d9ba9' }))
       windows.position.set(2.05 + i % 3 * .5, 0, 2.03); b.add(windows)
     }
+    // Distinct skyline silhouettes make each rotating arena feel like a different district.
+    const skylineProps = new THREE.Group(); this.arenaLandmarks.push(skylineProps); this.scene.add(skylineProps)
+    this.box(skylineProps, -17, 7, -47, 1.2, 14, 1.2, '#77727a')
+    this.box(skylineProps, -17, 14, -47, 8, .45, 1.1, '#d69a55')
+    this.box(skylineProps, -17, 16, -47, .35, 4, .35, '#d69a55')
+    this.box(skylineProps, -20.5, 10, -47, .3, 6, .3, '#d69a55')
+    const factoryProps = new THREE.Group(); this.arenaLandmarks.push(factoryProps); this.scene.add(factoryProps)
+    this.box(factoryProps, 17, 5, -48, 7, 10, 7, '#494b50')
+    this.box(factoryProps, 14.5, 14, -49, 1.8, 13, 1.8, '#69534c')
+    this.box(factoryProps, 19.5, 12, -46, 1.5, 9, 1.5, '#69534c')
+    this.box(factoryProps, 17, 10.5, -48, 12, .45, .45, '#b17b5d')
+    const neonProps = new THREE.Group(); this.arenaLandmarks.push(neonProps); this.scene.add(neonProps)
+    this.box(neonProps, -18, 8, -48, 7, 16, 6, '#303b58')
+    this.box(neonProps, -18, 17, -48, 9, .5, .5, '#536a9a')
+    const neonSign = new THREE.Mesh(new THREE.BoxGeometry(5.4, 2.2, .22), new THREE.MeshBasicMaterial({ color: '#42d9ed' }))
+    neonSign.position.set(-18, 10, -44.8); neonProps.add(neonSign)
+    const neonSign2 = new THREE.Mesh(new THREE.BoxGeometry(3.2, .28, .24), new THREE.MeshBasicMaterial({ color: '#ff4f9a' }))
+    neonSign2.position.set(-18, 6.8, -44.7); neonProps.add(neonSign2)
+    this.arenaLandmarks.forEach((group, index) => { group.visible = index === 0 })
+
     // Player rooftop
     const roof = new THREE.Group(); this.roof = roof; roof.position.set(0, 0, 5); this.scene.add(roof)
     this.box(roof, 0, -0.45, 0, 17, .9, 15, '#353b46')
@@ -216,6 +237,7 @@ export class RooftopArena {
     this.sun.color.set(arena.sun)
     this.sun.intensity = this.arenaIndex === 2 ? 2.2 : 3.2
     this.hemisphere.intensity = this.arenaIndex === 2 ? 1.35 : 2.1
+    this.arenaLandmarks.forEach((group, landmarkIndex) => { group.visible = landmarkIndex === this.arenaIndex })
     const paintRoof = (group: THREE.Group, floorColor: string, trimColor: string, coverColor: string, coverStart: number, coverEnd: number) => {
       const paint = (object: THREE.Object3D, color: string) => {
         const mesh = object as THREE.Mesh
