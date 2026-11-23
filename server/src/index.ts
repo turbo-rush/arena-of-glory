@@ -61,7 +61,10 @@ export default {
 }
 
 type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
+type AmmoState = Record<WeaponId, number>
+const MAGAZINES: AmmoState = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
+const RESERVES: AmmoState = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; roundWins: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number; weapon: WeaponId; ammo: AmmoState; reserve: AmmoState; reloadUntil: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
