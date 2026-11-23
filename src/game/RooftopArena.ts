@@ -24,12 +24,14 @@ export class RooftopArena {
   private enemyWalkTime = 0
   private recoil = 0
   private enemyHitTimer = 0
+  private crouched = false
+  private peekDirection: -1 | 0 | 1 = 0
   private muzzleTimer = 0
   private tracer: THREE.Line | null = null
   private listener: StateListener
   private host: HTMLElement
   private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload() }
-  private onKeyUp = (e: KeyboardEvent) => this.keys.delete(e.code)
+  private onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); if (e.code === 'KeyQ' || e.code === 'KeyE') this.peekDirection = 0 }
   private resizeObserver: ResizeObserver
 
   constructor(host: HTMLElement, listener: StateListener) {
@@ -122,6 +124,8 @@ export class RooftopArena {
   }
 
   start() { this.started = true }
+  crouch() { this.crouched = !this.crouched }
+  peek(direction: -1 | 1) { this.peekDirection = this.peekDirection === direction ? 0 : direction }
   setTouchKey(key: string, pressed: boolean) { pressed ? this.touchKeys.add(key) : this.touchKeys.delete(key) }
   aim() { this.aiming = !this.aiming }
   shoot() {
@@ -181,6 +185,8 @@ export class RooftopArena {
       const left = this.keys.has('KeyA') || this.touchKeys.has('KeyA')
       const right = this.keys.has('KeyD') || this.touchKeys.has('KeyD')
       const moving = forward || back || left || right
+      if (this.keys.has('KeyQ')) this.peekDirection = -1
+      else if (this.keys.has('KeyE')) this.peekDirection = 1
       if (forward) this.player.position.z -= speed
       if (back) this.player.position.z += speed
       if (left) this.player.position.x -= speed
@@ -190,8 +196,11 @@ export class RooftopArena {
       this.player.position.z = THREE.MathUtils.clamp(this.player.position.z, -1.8, 6.5)
       this.player.rotation.y = Math.PI
       const playerLegs = this.player.userData.legs as THREE.Mesh[]
-      playerLegs.forEach((leg, index) => { leg.rotation.x = moving ? Math.sin(this.walkTime + index * Math.PI) * .62 : THREE.MathUtils.damp(leg.rotation.x, 0, 9, dt) })
-      this.player.position.y = moving ? Math.abs(Math.sin(this.walkTime * 2)) * .07 : 0
+      playerLegs.forEach((leg, index) => { const walk = moving ? Math.sin(this.walkTime + index * Math.PI) * .62 : 0; leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.crouched ? -.85 + walk * .25 : walk, 10, dt) })
+      const targetCrouchY = this.crouched ? -.42 : 0
+      this.player.position.y = targetCrouchY + (moving && !this.crouched ? Math.abs(Math.sin(this.walkTime * 2)) * .07 : 0)
+      this.player.rotation.z = THREE.MathUtils.damp(this.player.rotation.z, this.peekDirection * -.2, 9, dt)
+      this.player.rotation.x = THREE.MathUtils.damp(this.player.rotation.x, this.crouched ? .12 : 0, 9, dt)
       const playerArm = this.player.userData.arm as THREE.Group
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
       this.recoil = Math.max(0, this.recoil - dt * 5)
@@ -222,7 +231,7 @@ export class RooftopArena {
     this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 18.4 : 20.2, 5, dt)
     this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 48 : 56, 6, dt)
     this.camera.updateProjectionMatrix()
-    this.camera.lookAt(this.player.position.x * .12, 1.3, -9.4)
+    this.camera.lookAt(this.player.position.x * .12 + this.peekDirection * .28, this.crouched ? .95 : 1.3, -9.4)
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
