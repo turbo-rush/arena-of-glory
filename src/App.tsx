@@ -49,7 +49,7 @@ export default function App() {
         <div className="weapon-icon">✦</div>
         <div className="weapon-info"><b>{({ pistol: 'VX-9 SIDEARM', rifle: 'AR-4 STRIKER', shotgun: 'BREACH-12', sniper: 'M-90 LONGSHOT' })[state.weapon]}</b><small>{({ pistol: 'SEMI-AUTO // 9MM', rifle: 'FULL-AUTO // 5.56MM', shotgun: 'PUMP ACTION // 12 GA', sniper: 'BOLT ACTION // .308' })[state.weapon]}</small></div>
         <div className="ammo"><b>{String(state.ammo).padStart(2, '0')}</b><small>/ {String(state.reserveAmmo).padStart(3, '0')}</small></div>
-        <button className="reload-btn" onClick={reload} aria-label="Перезарядить"><RotateCcw size={17}/></button>
+        <button className={`reload-btn${state.reloading ? " is-reloading" : ""}`} onClick={reload} aria-label="Перезарядить" disabled={state.reloading}><RotateCcw size={17}/>{state.reloading && <small>RELOAD</small>}</button>
         <button className="weapon-switch" onClick={() => gameRef.current?.switchWeapon()} aria-label="Сменить оружие">SWAP</button>
       </div>
 
