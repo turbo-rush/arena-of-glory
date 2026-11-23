@@ -200,8 +200,10 @@ export class DuelRoom {
         }
         player.shotTimes[typedWeapon] = now
         player.lastShotId = Number(shotId)
+        player.ammo[typedWeapon] = Math.max(0, player.ammo[typedWeapon] - 1)
         const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
-        socket.serializeAttachment({ ...(attachment ?? {}), shotTimes: player.shotTimes, lastShotId: player.lastShotId, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
+        socket.serializeAttachment({ ...(attachment ?? {}), shotTimes: player.shotTimes, lastShotId: player.lastShotId, ammo: player.ammo, reserve: player.reserve, weapon: player.weapon, reloadUntil: player.reloadUntil, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
+        socket.send(JSON.stringify({ type: "loadout_update", weapon: player.weapon, ammo: player.ammo[player.weapon], reserveAmmo: player.reserve[player.weapon], reloading: false }))
         const target = [...this.players.values()].find(candidate => candidate.id !== player.id)
         let damage = 0
         let hitZone: "head" | "body" | null = null
