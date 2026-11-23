@@ -11,6 +11,7 @@ export default function App() {
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
   const [displayName, setDisplayName] = useState('PLAYER')
+  const [selectedHero, setSelectedHero] = useState<'VOLT' | 'VEX'>(() => { try { return localStorage.getItem('aog-selected-hero') === 'VEX' ? 'VEX' : 'VOLT' } catch { return 'VOLT' } })
   const [inviteLink, setInviteLink] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [roomPhase, setRoomPhase] = useState<'idle' | 'connecting' | 'waiting' | 'ready' | 'fighting'>('idle')
@@ -142,6 +143,11 @@ export default function App() {
     }
   }
 
+  const chooseHero = (hero: 'VOLT' | 'VEX') => {
+    setSelectedHero(hero)
+    try { localStorage.setItem('aog-selected-hero', hero) } catch { /* selection remains active for this session */ }
+  }
+
   const playSolo = () => {
     leaveRoom()
     gameRef.current?.start()
@@ -252,13 +258,13 @@ export default function App() {
 
       <section className="hud">
         <div className={`fighter-card player-card${state.health <= 30 ? ' is-critical' : ''}`}>
-          <div className="fighter-card-top"><span className="fighter-avatar volt-avatar">V</span><div className="fighter-label"><span>YOU // VOLT</span><strong>{displayName.trim() || 'PLAYER'}</strong></div><b className="health-value">{state.health}<small>%</small></b></div>
+          <div className="fighter-card-top"><span className={`fighter-avatar ${selectedHero === "VOLT" ? "volt-avatar" : "vex-avatar"}`}>{selectedHero === "VOLT" ? "V" : "X"}</span><div className="fighter-label"><span>YOU // {selectedHero}</span><strong>{displayName.trim() || 'PLAYER'}</strong></div><b className="health-value">{state.health}<small>%</small></b></div>
           <div className="health-track"><span style={{ width: Math.max(0, Math.min(100, state.health)) + '%' }} /></div>
           <div className="health-caption"><span>VITALITY</span><span>{state.health <= 30 ? 'CRITICAL' : state.health <= 60 ? 'WOUNDED' : 'COMBAT READY'}</span></div>
         </div>
         <div className="versus"><span>VS</span></div>
         <div className={`fighter-card enemy-card${state.enemyHealth <= 30 ? ' is-critical' : ''}`}>
-          <div className="fighter-card-top"><span className="fighter-avatar vex-avatar">X</span><div className="fighter-label"><span>RIVAL // VEX</span><strong>{roomPlayers.find(player => player.playerId !== myPlayerId)?.displayName ?? 'RIVAL'}</strong></div><b className="health-value">{state.enemyHealth}<small>%</small></b></div>
+          <div className="fighter-card-top"><span className={`fighter-avatar ${selectedHero === "VOLT" ? "vex-avatar" : "volt-avatar"}`}>{selectedHero === "VOLT" ? "X" : "V"}</span><div className="fighter-label"><span>RIVAL // {selectedHero === "VOLT" ? "VEX" : "VOLT"}</span><strong>{roomPlayers.find(player => player.playerId !== myPlayerId)?.displayName ?? 'RIVAL'}</strong></div><b className="health-value">{state.enemyHealth}<small>%</small></b></div>
           <div className="health-track"><span style={{ width: Math.max(0, Math.min(100, state.enemyHealth)) + '%' }} /></div>
           <div className="health-caption"><span>VITALITY</span><span>{state.enemyHealth <= 30 ? 'CRITICAL' : state.enemyHealth <= 60 ? 'WOUNDED' : 'COMBAT READY'}</span></div>
         </div>
@@ -287,6 +293,19 @@ export default function App() {
         <div className="eyebrow">REAL PLAYERS. ONE ROOFTOP.</div>
         <h1>PRIVATE<br/><em>DUEL.</em></h1>
         <p>Create a private room and send your friend an invite link. Open a friend's link to join their duel.</p>
+        <div className="hero-select-heading"><span>01 / CHOOSE YOUR FIGHTER</span><i>ROOFTOP DIVISION</i></div>
+        <div className="hero-select-grid">
+          <button type="button" className={`hero-select-card hero-volt${selectedHero === "VOLT" ? " is-selected" : ""}`} onClick={() => chooseHero("VOLT")} aria-pressed={selectedHero === "VOLT"}>
+            <span className="hero-card-index">A // 01</span><span className="hero-sigil">V</span><span className="hero-card-name">VOLT</span><span className="hero-card-role">THE ALL-ROUNDER</span><span className="hero-card-desc">Bold. Precise. Unbreakable.</span>
+            <span className="hero-stat"><i>POWER</i><b><u style={{width:"82%"}} /></b></span><span className="hero-stat"><i>SPEED</i><b><u style={{width:"76%"}} /></b></span><span className="hero-stat"><i>CONTROL</i><b><u style={{width:"88%"}} /></b></span>
+            <span className="hero-select-state">{selectedHero === "VOLT" ? "✓ SELECTED" : "SELECT FIGHTER"}</span>
+          </button>
+          <button type="button" className={`hero-select-card hero-vex${selectedHero === "VEX" ? " is-selected" : ""}`} onClick={() => chooseHero("VEX")} aria-pressed={selectedHero === "VEX"}>
+            <span className="hero-card-index">B // 02</span><span className="hero-sigil">X</span><span className="hero-card-name">VEX</span><span className="hero-card-role">THE STRIKE SPECIALIST</span><span className="hero-card-desc">Fast. Fearless. Relentless.</span>
+            <span className="hero-stat"><i>POWER</i><b><u style={{width:"74%"}} /></b></span><span className="hero-stat"><i>SPEED</i><b><u style={{width:"94%"}} /></b></span><span className="hero-stat"><i>CONTROL</i><b><u style={{width:"78%"}} /></b></span>
+            <span className="hero-select-state">{selectedHero === "VEX" ? "✓ SELECTED" : "SELECT FIGHTER"}</span>
+          </button>
+        </div>
         <label className="lobby-label">PLAYER NAME</label>
         <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />
         {roomPhase === 'idle' && <>
