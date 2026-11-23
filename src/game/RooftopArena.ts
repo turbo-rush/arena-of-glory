@@ -68,9 +68,6 @@ export class RooftopArena {
   private sun!: THREE.DirectionalLight
   private hemisphere!: THREE.HemisphereLight
   private arenaLandmarks: THREE.Group[] = []
-  private explosiveBarrel!: THREE.Group
-  private explosionVisual: THREE.Mesh | null = null
-  private explosionTimer = 0
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -169,17 +166,6 @@ export class RooftopArena {
     this.box(far, 0, .1, -5.8, 15, 1.3, .5, '#656a72')
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
-    // A marked explosive barrel sits in the firing lane between rooftops.
-    this.explosiveBarrel = new THREE.Group()
-    const barrelBody = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, 1.25, 10), this.material('#b84b35', .55))
-    barrelBody.position.y = .68; barrelBody.castShadow = true; barrelBody.userData.explosive = true; this.explosiveBarrel.add(barrelBody)
-    for (const y of [.28, 1.02]) {
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, .11, 10), this.material('#343b43', .4))
-      band.position.y = y; band.castShadow = true; band.userData.explosive = true; this.explosiveBarrel.add(band)
-    }
-    const warning = new THREE.Mesh(new THREE.BoxGeometry(.5, .28, .035), new THREE.MeshBasicMaterial({ color: '#ffd36b' }))
-    warning.position.set(0, .72, .485); warning.userData.explosive = true; this.explosiveBarrel.add(warning)
-    this.explosiveBarrel.position.set(1.4, 0, 1.0); far.add(this.explosiveBarrel)
     this.player = this.createFighter('#e5a23b', '#263342')
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('#d64f48', '#20232d')
@@ -271,9 +257,6 @@ export class RooftopArena {
   private resetRoundState() {
     this.health = 100; this.enemyHealth = 100
     this.hitFeedback = ''; this.hitFeedbackTimer = 0
-    this.explosiveBarrel.visible = true
-    if (this.explosionVisual) { this.scene.remove(this.explosionVisual); this.explosionVisual.geometry.dispose(); (this.explosionVisual.material as THREE.Material).dispose(); this.explosionVisual = null }
-    this.explosionTimer = 0
     this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
     this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
     this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.reloadTimer = 0
@@ -330,7 +313,6 @@ export class RooftopArena {
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
     let totalDamage = 0
     let headHits = 0
-    let barrelTriggered = false
     this.enemy.updateMatrixWorld(true)
     const raycaster = new THREE.Raycaster()
     for (let pellet = 0; pellet < config.pellets; pellet++) {
@@ -344,16 +326,13 @@ export class RooftopArena {
       const direction = target.clone().sub(origin).normalize()
       raycaster.set(origin, direction)
       raycaster.far = origin.distanceTo(target) + .65
-      const targets = this.explosiveBarrel.visible ? [this.enemy, this.explosiveBarrel] : [this.enemy]
-      const hit = raycaster.intersectObjects(targets, true)[0]
-      if (hit && hit.object.userData.explosive) { barrelTriggered = true; break }
-      if (hit && hit.object.userData.hitZone && this.hasLineOfSight(origin, hit.point) && !this.isEnemyProtected()) {
+      const hit = raycaster.intersectObjects(this.enemy.children, true).find(item => item.object.userData.hitZone)
+      if (hit && this.hasLineOfSight(origin, hit.point) && !this.isEnemyProtected()) {
         const isHead = hit.object.userData.hitZone === 'head'
         totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
         if (isHead) headHits++
       }
     }
-    if (barrelTriggered) this.detonateBarrel()
     if (totalDamage > 0) {
       this.hitFeedback = headHits > 0 ? 'HEADSHOT' : 'HIT'
       this.hitFeedbackId++
@@ -368,24 +347,6 @@ export class RooftopArena {
     this.publish()
     if (this.enemyHealth === 0) this.finish('VICTORY')
   }
-  private detonateBarrel() {
-    if (!this.explosiveBarrel.visible) return
-    this.explosiveBarrel.visible = false
-    const center = new THREE.Vector3(); this.explosiveBarrel.getWorldPosition(center); center.y += .7
-    const blast = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshBasicMaterial({ color: '#ff9a42', transparent: true, opacity: .78, depthWrite: false }))
-    blast.position.copy(center); blast.scale.setScalar(.5); this.scene.add(blast)
-    this.explosionVisual = blast; this.explosionTimer = .48
-    this.spawnImpact(center, '#ffd36b', 30)
-    const playerPosition = new THREE.Vector3(); this.player.getWorldPosition(playerPosition); playerPosition.y += 1
-    const enemyPosition = new THREE.Vector3(); this.enemy.getWorldPosition(enemyPosition); enemyPosition.y += 1
-    if (center.distanceTo(playerPosition) < 6.2) { this.health = Math.max(0, this.health - 38); this.damageFlashId++; this.spawnImpact(playerPosition, '#ff805e', 8) }
-    if (center.distanceTo(enemyPosition) < 6.2) { this.enemyHealth = Math.max(0, this.enemyHealth - 42); this.enemyHitTimer = .55; this.spawnImpact(enemyPosition, '#ffb36b', 10) }
-    this.hitFeedback = 'EXPLOSION'; this.hitFeedbackId++; this.hitFeedbackTimer = .85
-    this.publish()
-    if (this.health === 0) this.finish('DEFEAT')
-    else if (this.enemyHealth === 0) this.finish('VICTORY')
-  }
-
   private flash(fighter: THREE.Group) {
     const muzzle = fighter.userData.muzzle as THREE.Mesh
     muzzle.visible = true
@@ -469,16 +430,6 @@ export class RooftopArena {
       this.hitFeedbackTimer = Math.max(0, this.hitFeedbackTimer - dt)
       if (this.hitFeedbackTimer === 0 && this.hitFeedback) { this.hitFeedback = ''; this.publish() }
     }
-    if (this.explosionVisual && this.explosionTimer > 0) {
-      this.explosionTimer = Math.max(0, this.explosionTimer - dt)
-      const progress = 1 - this.explosionTimer / .48
-      this.explosionVisual.scale.setScalar(.5 + progress * 5.2)
-      ;(this.explosionVisual.material as THREE.MeshBasicMaterial).opacity = Math.max(0, this.explosionTimer / .48) * .78
-      if (this.explosionTimer === 0) {
-        this.scene.remove(this.explosionVisual); this.explosionVisual.geometry.dispose()
-        ;(this.explosionVisual.material as THREE.Material).dispose(); this.explosionVisual = null
-      }
-    }
     if (this.impactParticles.length) {
       for (let i = this.impactParticles.length - 1; i >= 0; i--) {
         const particle = this.impactParticles[i]
@@ -540,7 +491,7 @@ export class RooftopArena {
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
       this.enemyCoverTimer += dt
-      const coverDecisionInterval = this.enemyHealth < 60 ? 3.8 : 5.2
+      const coverDecisionInterval = this.enemyHealth < 60 ? 2.9 : 3.8
       if (this.enemyCoverTimer > coverDecisionInterval) {
         this.enemyCoverTimer = 0
         // A wounded opponent favors cover; otherwise it alternates between strafing and cover.
@@ -549,8 +500,8 @@ export class RooftopArena {
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
       if (this.enemyCovering) {
         this.enemyPeekTimer += dt
-        if (this.enemyPeekTimer >= 3.2) this.enemyPeekTimer = 0
-        this.enemyPeeking = this.enemyPeekTimer > 2.15
+        if (this.enemyPeekTimer >= 2.55) this.enemyPeekTimer = 0
+        this.enemyPeeking = this.enemyPeekTimer > 1.45
       } else {
         this.enemyPeekTimer = 0
         this.enemyPeeking = false
@@ -560,12 +511,12 @@ export class RooftopArena {
       this.enemy.rotation.z = THREE.MathUtils.damp(this.enemy.rotation.z, this.enemyHitTimer > 0 ? .16 : 0, 12, dt)
       this.enemy.rotation.x = THREE.MathUtils.damp(this.enemy.rotation.x, this.enemyHitTimer > 0 ? -.09 : 0, 10, dt)
       const enemyBaseX = 1.4
-      const enemyStrafe = Math.sin(this.enemyWalkTime * .72) * 1.65
+      const enemyStrafe = Math.sin(this.enemyWalkTime * 1.05) * 2.05
       const playerWorldX = this.player.position.x
       const enemyTargetX = this.enemyCovering ? (this.enemyPeeking ? 5.65 : 4.2) : THREE.MathUtils.clamp(enemyBaseX + enemyStrafe + playerWorldX * .16, -3.8, 3.8)
       const enemyTargetZ = this.enemyCovering ? -3.35 : -1.7
-      this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 2.8, dt)
-      this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 2.8, dt)
+      this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 3.8, dt)
+      this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
       const enemyMoving = Math.abs(this.enemy.position.x - enemyTargetX) > .12 || Math.abs(this.enemy.position.z - enemyTargetZ) > .12
       enemyLegs.forEach((leg, index) => {
@@ -591,8 +542,8 @@ export class RooftopArena {
           const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, this.crouched ? .78 : 1.2, 0))
           const clearShot = this.hasLineOfSight(enemyOrigin, playerTarget)
           if (!protectedByCover && clearShot && !this.isEnemyProtected()) {
-            const baseDamage = this.enemyHealth < 45 ? 11 : 8
-            this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 3 : baseDamage))
+            const baseDamage = this.enemyHealth < 45 ? 13 : 10
+            this.health = Math.max(0, this.health - (Math.random() > .5 ? baseDamage + 4 : baseDamage))
             this.damageFlashId++
             this.spawnImpact(playerTarget, '#ff805e', 5)
           }
@@ -602,9 +553,9 @@ export class RooftopArena {
         }
       } else {
         enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering && !this.enemyPeeking ? .12 : -.28, 7, dt)
-        if (this.enemyTimer > (this.enemyHealth < 45 ? 2.25 : 2.65) && this.enemyHealth > 0) {
+        if (this.enemyTimer > (this.enemyHealth < 45 ? 1.65 : 2.0) && this.enemyHealth > 0) {
           this.enemyTimer = 0
-          if (Math.random() > .12 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = .42
+          if (Math.random() > .04 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = .32
         }
       }
     }
