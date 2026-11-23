@@ -5,7 +5,7 @@ import { RooftopArena, type GameState } from './game/RooftopArena'
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<RooftopArena | null>(null)
-  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0, roundsWon: 0, roundsLost: 0, roundNumber: 1, arenaName: 'SKYLINE // GOLDEN HOUR' })
+  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0, roundsWon: 0, roundsLost: 0, roundNumber: 1, arenaName: 'SKYLINE // GOLDEN HOUR', hitFeedback: '', hitFeedbackId: 0, damageFlashId: 0 })
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
 
@@ -22,6 +22,8 @@ export default function App() {
 
   return (
     <main className="game-shell">
+      {state.damageFlashId > 0 && <div key={state.damageFlashId} className="damage-flash" />}
+      {state.hitFeedback && <div key={state.hitFeedbackId} className={`hit-feedback${state.hitFeedback === 'HEADSHOT' ? ' is-headshot' : ''}`}><span className="hit-crosshair">✣</span><b>{state.hitFeedback}</b></div>}
       <div className="scene" ref={mountRef} />
       <div className="vignette" />
       <header className="topbar">
