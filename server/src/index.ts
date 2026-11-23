@@ -197,10 +197,9 @@ export class DuelRoom {
           const along = dx * directionX + dz * directionZ
           const perpendicular = Math.abs(dx * directionZ - dz * directionX)
           const range = typedWeapon === "sniper" ? 70 : typedWeapon === "rifle" ? 45 : typedWeapon === "shotgun" ? 16 : 32
-          const verticalAngle = Math.atan2(1.35, Math.max(1, Math.hypot(dx, dz)))
-          const pitchError = Math.abs((aimPitch as number) - verticalAngle)
-          if (along > 0 && along <= range && perpendicular < (typedWeapon === "shotgun" ? 1.15 : .72) && pitchError < (typedWeapon === "sniper" ? .12 : .19)) {
-            hitZone = (aimPitch as number) > verticalAngle + .025 ? "head" : "body"
+          const pitchError = Math.abs(aimPitch as number)
+          if (along > 0 && along <= range && perpendicular < (typedWeapon === "shotgun" ? 1.15 : .72) && pitchError < .42) {
+            hitZone = (aimPitch as number) > .025 ? "head" : "body"
             const baseDamage: Record<WeaponId, number> = { pistol: 18, rifle: 12, shotgun: 28, sniper: 48 }
             damage = hitZone === "head" ? Math.round(baseDamage[typedWeapon] * (typedWeapon === "sniper" ? 2.5 : typedWeapon === "pistol" ? 2.2 : typedWeapon === "rifle" ? 1.8 : 1.25)) : baseDamage[typedWeapon]
             target.health = Math.max(0, target.health - damage)
