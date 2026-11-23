@@ -299,6 +299,10 @@ export class DuelRoom {
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
         lastInputSeq: attachment.lastInputSeq ?? 0,
+        weapon: attachment.weapon ?? "pistol",
+        ammo: attachment.ammo ?? { ...MAGAZINES },
+        reserve: attachment.reserve ?? { ...RESERVES },
+        reloadUntil: attachment.reloadUntil ?? 0,
       })
     }
     this.updatePhase()
