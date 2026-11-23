@@ -295,6 +295,12 @@ export class RooftopArena {
     if (weapon !== this.remoteWeapon) this.applyRemoteWeaponSwitch(weapon)
     this.remoteReloadTimer = this.reloadDuration
   }
+  applyOnlineResume(health: number) {
+    if (!this.onlineMode) return
+    this.health = THREE.MathUtils.clamp(health, 0, 100)
+    this.publish()
+  }
+
   applyOnlineLoadout(weapon: WeaponId, ammo: number, reserveAmmo: number, reloading: boolean) {
     if (!this.onlineMode) return
     this.weapon = weapon
