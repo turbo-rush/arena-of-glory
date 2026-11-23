@@ -304,6 +304,25 @@ export class RooftopArena {
     if (this.health <= 0) this.gameStatus = 'DEFEAT'
     this.publish()
   }
+  applyOnlineRoundResult(roundNumber: number, won: boolean) {
+    if (!this.onlineMode) return
+    if (won) this.roundsWon++
+    else this.roundsLost++
+    this.roundNumber = roundNumber
+    this.resetRoundState()
+    this.applyArena((roundNumber - 1) % ARENAS.length)
+    this.gameStatus = 'FIGHT'
+    this.started = true
+    this.publish()
+  }
+  applyOnlineMatchResult(won: boolean) {
+    if (!this.onlineMode) return
+    if (won) this.roundsWon++
+    else this.roundsLost++
+    this.started = false
+    this.gameStatus = won ? 'VICTORY' : 'DEFEAT'
+    this.publish()
+  }
   rejectOnlineShot() {
     if (!this.onlineMode) return
     const magazine = WEAPONS[this.weapon].magazine
