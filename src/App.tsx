@@ -5,7 +5,7 @@ import { RooftopArena, type GameState } from './game/RooftopArena'
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<RooftopArena | null>(null)
-  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reloading: false, status: 'FIGHT', kills: 0 })
+  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0 })
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
 
@@ -47,9 +47,10 @@ export default function App() {
 
       <div className="weapon-panel">
         <div className="weapon-icon">✦</div>
-        <div className="weapon-info"><b>VX-9 SIDEARM</b><small>SEMI-AUTO // 9MM</small></div>
-        <div className="ammo"><b>{String(state.ammo).padStart(2, '0')}</b><small>/ 048</small></div>
+        <div className="weapon-info"><b>{({ pistol: 'VX-9 SIDEARM', rifle: 'AR-4 STRIKER', shotgun: 'BREACH-12', sniper: 'M-90 LONGSHOT' })[state.weapon]}</b><small>{({ pistol: 'SEMI-AUTO // 9MM', rifle: 'FULL-AUTO // 5.56MM', shotgun: 'PUMP ACTION // 12 GA', sniper: 'BOLT ACTION // .308' })[state.weapon]}</small></div>
+        <div className="ammo"><b>{String(state.ammo).padStart(2, '0')}</b><small>/ {String(state.reserveAmmo).padStart(3, '0')}</small></div>
         <button className="reload-btn" onClick={reload} aria-label="Перезарядить"><RotateCcw size={17}/></button>
+        <button className="weapon-switch" onClick={() => gameRef.current?.switchWeapon()} aria-label="Сменить оружие">SWAP</button>
       </div>
 
       <div className="controls-hint"><span>W A S D</span> MOVE <span>C</span> CROUCH <span>Q / E</span> PEEK</div>
