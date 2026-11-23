@@ -31,6 +31,9 @@ export class RooftopArena {
   private onLocalReload?: () => void
   private onLocalSwitchWeapon?: (weapon: WeaponId) => void
   private remoteCrouched = false
+  private remoteWeapon: WeaponId = 'pistol'
+  private remoteReloadTimer = 0
+  private remoteFireTimer = 0
   private remoteTarget = new THREE.Vector3(1.4, 0, -1.7)
   private remoteTargetYaw = Math.PI
   private keys = new Set<string>()
@@ -223,8 +226,7 @@ export class RooftopArena {
     return group
   }
 
-  private rebuildWeaponModel() {
-    const model = this.player.userData.weaponModel as THREE.Group
+  private buildWeaponModel(model: THREE.Group, weapon: WeaponId) {
     model.clear()
     const dark = this.material('#20242b', .38)
     const metal = this.material('#59616c', .34)
@@ -232,27 +234,17 @@ export class RooftopArena {
       const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
       part.position.set(x, y, z); part.castShadow = true; model.add(part)
     }
-    if (this.weapon === 'pistol') {
-      addPart(.16, .17, .48, 0, 0, -.08)
-      addPart(.13, .25, .15, 0, -.17, .02)
-      addPart(.08, .08, .12, 0, .08, -.34, metal)
-    } else if (this.weapon === 'rifle') {
-      addPart(.17, .2, .82, 0, 0, -.2)
-      addPart(.12, .12, .62, 0, .03, -.69, metal)
-      addPart(.15, .3, .22, 0, -.2, -.08)
-      addPart(.18, .16, .3, 0, -.02, .31)
-    } else if (this.weapon === 'shotgun') {
-      addPart(.2, .22, .72, 0, 0, -.18)
-      addPart(.09, .09, .72, 0, .04, -.68, metal)
-      addPart(.16, .13, .3, 0, -.1, .28)
-      addPart(.17, .1, .26, 0, -.12, -.38)
+    if (weapon === 'pistol') {
+      addPart(.16, .17, .48, 0, 0, -.08); addPart(.13, .25, .15, 0, -.17, .02); addPart(.08, .08, .12, 0, .08, -.34, metal)
+    } else if (weapon === 'rifle') {
+      addPart(.17, .2, .82, 0, 0, -.2); addPart(.12, .12, .62, 0, .03, -.69, metal); addPart(.15, .3, .22, 0, -.2, -.08); addPart(.18, .16, .3, 0, -.02, .31)
+    } else if (weapon === 'shotgun') {
+      addPart(.2, .22, .72, 0, 0, -.18); addPart(.09, .09, .72, 0, .04, -.68, metal); addPart(.16, .13, .3, 0, -.1, .28); addPart(.17, .1, .26, 0, -.12, -.38)
     } else {
-      addPart(.19, .2, .78, 0, 0, -.22)
-      addPart(.075, .075, 1.0, 0, .07, -.86, metal)
-      addPart(.2, .24, .28, 0, .19, -.32)
-      addPart(.18, .14, .38, 0, -.04, .35)
+      addPart(.19, .2, .78, 0, 0, -.22); addPart(.075, .075, 1.0, 0, .07, -.86, metal); addPart(.2, .24, .28, 0, .19, -.32); addPart(.18, .14, .38, 0, -.04, .35)
     }
   }
+  private rebuildWeaponModel() { this.buildWeaponModel(this.player.userData.weaponModel as THREE.Group, this.weapon) }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
   startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void, onLocalReload: () => void, onLocalSwitchWeapon: (weapon: WeaponId) => void) {
     this.onlineMode = true
@@ -287,6 +279,17 @@ export class RooftopArena {
     this.remoteTargetYaw = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
     const legs = this.enemy.userData.legs as THREE.Mesh[]
     legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
+  }
+  applyRemoteWeaponSwitch(weapon: WeaponId) {
+    if (!this.onlineMode) return
+    this.remoteWeapon = weapon
+    this.buildWeaponModel(this.enemy.userData.weaponModel as THREE.Group, weapon)
+    this.remoteReloadTimer = 0
+  }
+  applyRemoteReload(weapon: WeaponId) {
+    if (!this.onlineMode) return
+    if (weapon !== this.remoteWeapon) this.applyRemoteWeaponSwitch(weapon)
+    this.remoteReloadTimer = this.reloadDuration
   }
   applyOnlineLoadout(weapon: WeaponId, ammo: number, reserveAmmo: number, reloading: boolean) {
     if (!this.onlineMode) return
@@ -357,6 +360,9 @@ export class RooftopArena {
     if (!this.onlineMode) return
     const muzzle = this.enemy.userData.muzzle as THREE.Mesh
     muzzle.visible = true
+    this.remoteFireTimer = .2
+    const arm = this.enemy.userData.arm as THREE.Group
+    arm.rotation.x = -.62
     window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, 90)
   }
   continueRound() { if (this.gameStatus === 'ROUND_BREAK') this.beginNextRound() }
@@ -801,9 +807,16 @@ export class RooftopArena {
           })
         }
         const remoteLegs = this.enemy.userData.legs as THREE.Mesh[]
+        const remoteMoving = Math.hypot(this.remoteTarget.x - this.enemy.position.x, this.remoteTarget.z - this.enemy.position.z) > .12
         remoteLegs.forEach((leg, index) => {
-          leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.remoteCrouched ? -.62 : Math.sin(this.enemyWalkTime * 1.8 + index * Math.PI) * .025, 8, dt)
+          const stride = remoteMoving ? Math.sin(this.enemyWalkTime * 7 + index * Math.PI) * .38 : 0
+          leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.remoteCrouched ? -.62 + stride * .2 : stride, 9, dt)
         })
+        this.remoteReloadTimer = Math.max(0, this.remoteReloadTimer - dt)
+        this.remoteFireTimer = Math.max(0, this.remoteFireTimer - dt)
+        const remoteArm = this.enemy.userData.arm as THREE.Group
+        const remoteTargetArm = this.remoteReloadTimer > 0 ? 1.05 : this.remoteFireTimer > 0 ? -.62 : this.remoteCrouched ? -.08 : -.28
+        remoteArm.rotation.x = THREE.MathUtils.damp(remoteArm.rotation.x, remoteTargetArm, this.remoteReloadTimer > 0 ? 7 : 12, dt)
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
