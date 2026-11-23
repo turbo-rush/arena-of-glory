@@ -361,10 +361,12 @@ export class DuelRoom {
 
   private sendResumeState(socket: WebSocket, player: Player): void {
     socket.send(JSON.stringify({ type: "loadout_update", weapon: player.weapon, ammo: player.ammo[player.weapon], reserveAmmo: player.reserve[player.weapon], reloading: Date.now() < player.reloadUntil }))
-    socket.send(JSON.stringify({ type: "resume_state", phase: this.phase, health: player.health, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, roundWins: player.roundWins }))
+    const opponentWins = [...this.players.values()].find(candidate => candidate.id !== player.id)?.roundWins ?? 0
+    socket.send(JSON.stringify({ type: "resume_state", phase: this.phase, health: player.health, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, roundWins: player.roundWins, opponentWins }))
     for (const other of this.players.values()) {
       if (other.id !== player.id && other.socket) {
         socket.send(JSON.stringify({ type: "input", input: { seq: other.lastInputSeq, clientTime: Date.now(), moveX: other.x, moveZ: other.z, lookYaw: other.yaw, lookPitch: other.pitch, crouched: false, aiming: false } }))
+        socket.send(JSON.stringify({ type: "switch_weapon", weapon: other.weapon }))
       }
     }
     this.broadcastRoomState()
