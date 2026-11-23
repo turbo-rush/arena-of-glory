@@ -203,6 +203,8 @@ export class DuelRoom {
             const baseDamage: Record<WeaponId, number> = { pistol: 18, rifle: 12, shotgun: 28, sniper: 48 }
             damage = hitZone === "head" ? Math.round(baseDamage[typedWeapon] * (typedWeapon === "sniper" ? 2.5 : typedWeapon === "pistol" ? 2.2 : typedWeapon === "rifle" ? 1.8 : 1.25)) : baseDamage[typedWeapon]
             target.health = Math.max(0, target.health - damage)
+            const targetAttachment = target.socket.deserializeAttachment() as Record<string, unknown> | null
+            target.socket.serializeAttachment({ ...(targetAttachment ?? {}), health: target.health })
             target.socket.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
           }
         }
