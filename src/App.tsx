@@ -15,6 +15,7 @@ export default function App() {
   const [roomCode, setRoomCode] = useState('')
   const [roomPhase, setRoomPhase] = useState<'idle' | 'connecting' | 'waiting' | 'ready' | 'fighting'>('idle')
   const [roomPlayers, setRoomPlayers] = useState<{ playerId: string; displayName: string; ready: boolean; connected: boolean }[]>([])
+  const [myPlayerId, setMyPlayerId] = useState('')
   const [roomError, setRoomError] = useState('')
   const transportRef = useRef<DuelWebSocketTransport | null>(null)
 
@@ -32,11 +33,14 @@ export default function App() {
     setRoomError('')
     setRoomCode(code)
     setRoomPlayers([])
+    setMyPlayerId('')
     setRoomPhase('connecting')
     const transport = createDuelTransport(url)
     transportRef.current = transport
     transport.onMessage((message: ServerDuelMessage) => {
-      if (message.type === 'room_state') {
+      if (message.type === 'welcome') {
+        setMyPlayerId(message.playerId)
+      } else if (message.type === 'room_state') {
         setRoomPlayers(message.players)
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' ? 'ready' : 'waiting')
       } else if (message.type === 'match_started') {
@@ -107,6 +111,7 @@ export default function App() {
     transportRef.current = null
     setRoomCode('')
     setRoomPlayers([])
+    setMyPlayerId('')
     setRoomPhase('idle')
     setRoomError('')
   }
@@ -186,8 +191,8 @@ export default function App() {
             const player = roomPlayers[index]
             return <div className="room-player" key={index}><span className="player-slot">{index + 1}</span><div><b>{player?.displayName ?? (index === 0 ? 'WAITING FOR YOU' : 'WAITING FOR OPPONENT')}</b><small>{player ? (player.ready ? 'READY' : 'CONNECTED') : 'NOT CONNECTED'}</small></div><i className={player?.ready ? 'player-ready' : ''}>{player?.ready ? '✓' : '—'}</i></div>
           })}</div>
-          {roomPhase !== 'fighting' && roomPhase !== 'connecting' && <button className="lobby-primary" onClick={setReady}>I'M READY <span>→</span></button>}
-          <p className="lobby-note">Lobby connection is live. Real-time character movement and combat synchronization are the next development stage.</p>
+          {roomPhase !== 'fighting' && roomPhase !== 'connecting' && !roomPlayers.some(player => player.playerId === myPlayerId && player.ready) && <button className="lobby-primary" onClick={setReady}>I'M READY <span>→</span></button>}
+          <p className="lobby-note">Player movement and firing animations are relayed live. Server-validated hits, damage and match scoring are the next stage.</p>
           <button className="lobby-secondary" onClick={leaveRoom}>LEAVE ROOM</button>
         </div>}
         {roomError && <div className="lobby-error">{roomError}</div>}
