@@ -19,6 +19,8 @@ export default function App() {
   const [roomError, setRoomError] = useState('')
   const transportRef = useRef<DuelWebSocketTransport | null>(null)
   const shotSequenceRef = useRef(0)
+  const onlineModeRef = useRef(false)
+  const resumeStorageKey = 'arena-of-glory:duel-resume'
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -27,10 +29,13 @@ export default function App() {
     return () => { game.destroy(); gameRef.current = null }
   }, [])
 
-  useEffect(() => () => transportRef.current?.close(), [])
+  useEffect(() => () => transportRef.current?.suspend(), [])
 
   const connectToRoom = async (url: string, code: string) => {
     transportRef.current?.close()
+    gameRef.current?.stopOnline()
+    onlineModeRef.current = false
+    try { sessionStorage.removeItem(resumeStorageKey) } catch { /* storage may be unavailable */ }
     setRoomError('')
     setRoomCode(code)
     setRoomPlayers([])
@@ -41,6 +46,7 @@ export default function App() {
     transport.onMessage((message: ServerDuelMessage) => {
       if (message.type === 'welcome') {
         setMyPlayerId(message.playerId)
+        try { sessionStorage.setItem(resumeStorageKey, JSON.stringify({ url: transport.reconnectUrl, roomCode: code, displayName })) } catch { /* session resume is optional */ }
       } else if (message.type === 'room_state') {
         setRoomPlayers(message.players)
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
@@ -53,12 +59,22 @@ export default function App() {
           () => transport.send({ type: 'reload' }),
           weapon => transport.send({ type: 'switch_weapon', weapon })
         )
+        onlineModeRef.current = true
       } else if (message.type === 'input') {
         gameRef.current?.applyRemoteInput(message.input)
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
       } else if (message.type === 'resume_state') {
-        gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins)
+        if (!onlineModeRef.current) {
+          gameRef.current?.startOnline(
+            input => transport.send({ type: 'input', input }),
+            (weapon, aimYaw, aimPitch) => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw, aimPitch }),
+            () => transport.send({ type: 'reload' }),
+            weapon => transport.send({ type: 'switch_weapon', weapon })
+          )
+          onlineModeRef.current = true
+        }
+        gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins, message.x, message.z)
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
         setStarted(message.phase === 'fighting' || message.phase === 'round_break')
       } else if (message.type === 'loadout_update') {
@@ -97,6 +113,8 @@ export default function App() {
         } else {
           setRoomPhase('idle')
           gameRef.current?.stopOnline()
+          onlineModeRef.current = false
+          try { sessionStorage.removeItem(resumeStorageKey) } catch { /* storage may be unavailable */ }
           setStarted(false)
           setRoomError('Не удалось восстановить соединение. Попробуйте снова войти в комнату.')
         }
@@ -154,6 +172,23 @@ export default function App() {
 
   useEffect(() => {
     const inviteCode = new URLSearchParams(window.location.search).get('room')
+    try {
+      const raw = sessionStorage.getItem(resumeStorageKey)
+      if (raw) {
+        const saved = JSON.parse(raw) as { url?: unknown; roomCode?: unknown; displayName?: unknown }
+        const savedCode = typeof saved.roomCode === 'string' ? saved.roomCode.toUpperCase() : ''
+        const inviteMatches = !inviteCode || inviteCode.toUpperCase() === savedCode
+        if (inviteMatches && typeof saved.url === 'string' && typeof saved.roomCode === 'string' && /^[A-HJ-NP-Z2-9]{6}$/i.test(saved.roomCode)) {
+          if (typeof saved.displayName === 'string') setDisplayName(saved.displayName)
+          const invite = new URL(window.location.href)
+          invite.searchParams.set('room', saved.roomCode)
+          setInviteLink(invite.toString())
+          void connectToRoom(saved.url, saved.roomCode)
+          return
+        }
+        if (!inviteMatches) sessionStorage.removeItem(resumeStorageKey)
+      }
+    } catch { /* ignore malformed or unavailable session storage */ }
     if (inviteCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(inviteCode)) void joinRoom(inviteCode)
   }, [])
 
@@ -167,6 +202,9 @@ export default function App() {
 
   const leaveRoom = () => {
     transportRef.current?.close()
+    gameRef.current?.stopOnline()
+    onlineModeRef.current = false
+    try { sessionStorage.removeItem(resumeStorageKey) } catch { /* storage may be unavailable */ }
     transportRef.current = null
     setRoomCode('')
     setInviteLink('')
