@@ -130,3 +130,30 @@
  .weapon-panel{bottom:145px}
  .touch-controls{bottom:42px}
 }
+
+
+/* Character select — NEON INK: URBAN PULSE */
+.hero-select-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:18px 0 8px;color:#ffca79;font:800 9px 'Barlow Condensed';letter-spacing:1.6px}
+.hero-select-heading i{font-style:normal;color:#7f8b9a;font-size:8px}
+.hero-select-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hero-select-card{position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0;padding:10px 11px 9px;text-align:left;background:linear-gradient(150deg,#202532f2,#101722f5);border:1px solid #ffffff2c;color:#f4f3ef;overflow:hidden;transition:border-color .18s,transform .18s,box-shadow .18s}
+.hero-select-card:after{content:'';position:absolute;top:0;right:0;width:42px;height:42px;background:linear-gradient(135deg,transparent 49%,#ffffff0c 50%)}
+.hero-select-card.is-selected{border-color:#ffb34e;box-shadow:inset 0 0 0 1px #ffb34e55,0 0 18px #ffb34e1e;transform:translateY(-2px)}
+.hero-vex.is-selected{border-color:#f052a0;box-shadow:inset 0 0 0 1px #f052a055,0 0 18px #f052a01e}
+.hero-card-index{font:700 8px 'Rajdhani';letter-spacing:1.6px;color:#a0a9b6}
+.hero-sigil{display:grid;place-items:center;align-self:flex-start;width:44px;height:48px;margin:8px 0 5px;border:2px solid #ffb34e;color:#ffbd65;background:linear-gradient(145deg,#3a2a23,#171b24);font:900 34px 'Barlow Condensed';font-style:italic;transform:skew(-7deg);text-shadow:0 0 14px #ff9d3b88}
+.hero-vex .hero-sigil{border-color:#f052a0;color:#ff83bd;background:linear-gradient(145deg,#39213a,#171b24);text-shadow:0 0 14px #f052a088}
+.hero-card-name{font:900 26px/.95 'Barlow Condensed';letter-spacing:2px}
+.hero-vex .hero-card-name{color:#ff8bc2}
+.hero-card-role{margin-top:3px;font:800 8px 'Barlow Condensed';letter-spacing:1px;color:#ffbd68}
+.hero-vex .hero-card-role{color:#ff83bd}
+.hero-card-desc{margin:6px 0 8px;font-size:9px;color:#c0c6d0;white-space:nowrap}
+.hero-stat{display:flex;align-items:center;gap:7px;margin:2px 0}
+.hero-stat i{width:43px;font:700 7px 'Rajdhani';font-style:normal;letter-spacing:1px;color:#8f9aaa}
+.hero-stat b{height:4px;flex:1;background:#39414e}
+.hero-stat u{display:block;height:100%;background:linear-gradient(90deg,#f18b39,#ffd17b);text-decoration:none}
+.hero-vex .hero-stat u{background:linear-gradient(90deg,#d83d8c,#ff9bc8)}
+.hero-select-state{margin-top:9px;padding:5px 4px;text-align:center;border:1px solid #ffffff28;color:#aab3bf;font:800 8px 'Barlow Condensed';letter-spacing:1.3px}
+.hero-select-card.is-selected .hero-select-state{border-color:#ffb34e77;color:#ffd18a;background:#ffb34e12}
+.hero-vex.is-selected .hero-select-state{border-color:#f052a077;color:#ff9bc8;background:#f052a012}
+@media(max-width:600px){.hero-select-heading{margin-top:13px;font-size:8px}.hero-select-grid{gap:7px}.hero-select-card{padding:8px}.hero-sigil{width:36px;height:39px;font-size:28px;margin:6px 0 4px}.hero-card-name{font-size:23px}.hero-card-role{font-size:7px}.hero-card-desc{font-size:8px;margin:5px 0 7px}.hero-stat i{font-size:6px;width:38px}.hero-select-state{font-size:7px;margin-top:7px}.lobby-card{padding:16px}.lobby-card h1{font-size:46px}.lobby-label{margin-top:12px}}
