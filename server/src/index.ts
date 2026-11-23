@@ -61,7 +61,7 @@ export default {
 }
 
 type WeaponId = "pistol" | "rifle" | "shotgun" | "sniper"
-type Player = { id: string; name: string; ready: boolean; socket: WebSocket; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
+type Player = { id: string; name: string; ready: boolean; socket: WebSocket; slot: 1 | 2; x: number; z: number; yaw: number; pitch: number; health: number; shotTimes: Partial<Record<WeaponId, number>>; lastShotId: number; lastInputSeq: number }
 
 export class DuelRoom {
   private players = new Map<string, Player>()
@@ -91,8 +91,8 @@ export class DuelRoom {
       const slot = (this.players.size + 1) as 1 | 2
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
-      server.serializeAttachment({ playerId, name, slot, ready: false, shotTimes: {}, lastShotId: 0 })
+      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
+      server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
       this.updatePhase()
       this.broadcastRoomState()
@@ -145,8 +145,12 @@ export class DuelRoom {
           typeof state.crouched === "boolean" && typeof state.aiming === "boolean"
         if (!valid) break
         player.lastInputSeq = Number(state.seq)
+        player.x = Number(state.moveX)
+        player.z = Number(state.moveZ)
+        player.yaw = Number(state.lookYaw)
+        player.pitch = Number(state.lookPitch)
         const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
-        socket.serializeAttachment({ ...(attachment ?? {}), lastInputSeq: player.lastInputSeq })
+        socket.serializeAttachment({ ...(attachment ?? {}), lastInputSeq: player.lastInputSeq, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
         this.broadcast({ type: "input", input: {
           seq: player.lastInputSeq, clientTime: Date.now(),
           moveX: Number(state.moveX), moveZ: Number(state.moveZ),
@@ -179,9 +183,32 @@ export class DuelRoom {
         player.shotTimes[typedWeapon] = now
         player.lastShotId = Number(shotId)
         const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
-        socket.serializeAttachment({ ...(attachment ?? {}), shotTimes: player.shotTimes, lastShotId: player.lastShotId })
-        socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: null, hitZone: null, damage: 0, targetHealth: null, accepted: true }))
-        this.broadcast(message, socket)
+        socket.serializeAttachment({ ...(attachment ?? {}), shotTimes: player.shotTimes, lastShotId: player.lastShotId, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch })
+        const target = [...this.players.values()].find(candidate => candidate.id !== player.id)
+        let damage = 0
+        let hitZone: "head" | "body" | null = null
+        if (target && target.health > 0) {
+          const shooterZ = player.slot === 1 ? 5 + player.z : -12.5 - player.z
+          const targetZ = player.slot === 1 ? -12.5 - target.z : 5 + target.z
+          const dx = target.x - player.x
+          const dz = targetZ - shooterZ
+          const directionX = Math.sin(aimYaw as number)
+          const directionZ = Math.cos(aimYaw as number) * (player.slot === 1 ? 1 : -1)
+          const along = dx * directionX + dz * directionZ
+          const perpendicular = Math.abs(dx * directionZ - dz * directionX)
+          const range = typedWeapon === "sniper" ? 70 : typedWeapon === "rifle" ? 45 : typedWeapon === "shotgun" ? 16 : 32
+          const verticalAngle = Math.atan2(1.35, Math.max(1, Math.hypot(dx, dz)))
+          const pitchError = Math.abs((aimPitch as number) - verticalAngle)
+          if (along > 0 && along <= range && perpendicular < (typedWeapon === "shotgun" ? 1.15 : .72) && pitchError < (typedWeapon === "sniper" ? .12 : .19)) {
+            hitZone = (aimPitch as number) > verticalAngle + .025 ? "head" : "body"
+            const baseDamage: Record<WeaponId, number> = { pistol: 18, rifle: 12, shotgun: 28, sniper: 48 }
+            damage = hitZone === "head" ? Math.round(baseDamage[typedWeapon] * (typedWeapon === "sniper" ? 2.5 : typedWeapon === "pistol" ? 2.2 : typedWeapon === "rifle" ? 1.8 : 1.25)) : baseDamage[typedWeapon]
+            target.health = Math.max(0, target.health - damage)
+            target.socket.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
+          }
+        }
+        socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: damage > 0 && target ? target.id : null, hitZone, damage, targetHealth: damage > 0 && target ? target.health : null, accepted: true }))
+        this.broadcast({ ...message, hit: damage > 0 }, socket)
         break
       }
       case "reload":
@@ -213,13 +240,19 @@ export class DuelRoom {
 
   private restorePlayers(): void {
     for (const socket of this.state.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number } | null
+      const attachment = socket.deserializeAttachment() as { playerId?: string; name?: string; slot?: 1 | 2; ready?: boolean; shotTimes?: Partial<Record<WeaponId, number>>; lastShotId?: number; lastInputSeq?: number; slot?: 1 | 2; x?: number; z?: number; yaw?: number; pitch?: number; health?: number } | null
       if (!attachment?.playerId || this.players.has(attachment.playerId)) continue
       this.players.set(attachment.playerId, {
         id: attachment.playerId,
         name: attachment.name ?? "PLAYER",
         ready: attachment.ready === true,
         socket,
+        slot: attachment.slot ?? 1,
+        x: attachment.x ?? 0,
+        z: attachment.z ?? 2.3,
+        yaw: attachment.yaw ?? Math.PI,
+        pitch: attachment.pitch ?? 0,
+        health: attachment.health ?? 100,
         shotTimes: attachment.shotTimes ?? {},
         lastShotId: attachment.lastShotId ?? 0,
         lastInputSeq: attachment.lastInputSeq ?? 0,
