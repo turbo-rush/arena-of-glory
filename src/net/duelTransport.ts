@@ -37,6 +37,7 @@ export type ServerDuelMessage =
   | { type: 'snapshot'; serverTick: number; ackInputSeq: number; players: { playerId: string; x: number; y: number; z: number; yaw: number; health: number; ammo: number; weapon: WeaponId; alive: boolean }[] }
   | { type: 'health_update'; health: number; damage: number; hitZone: HitZone; shooterId: string }
   | { type: 'shot_result'; shotId: number; shooterId: string; hitPlayerId: string | null; hitZone: HitZone | null; damage: number; targetHealth: number | null; accepted: boolean }
+  | { type: 'loadout_update'; weapon: WeaponId; ammo: number; reserveAmmo: number; reloading: boolean }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'pong'; clientTime: number; serverTime: number }
