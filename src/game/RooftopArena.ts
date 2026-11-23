@@ -186,6 +186,7 @@ export class RooftopArena {
     for (let i = 0; i < 5; i++) this.box(roof, -6 + i * 3, .12, 5.5, 1.2, .25, 1.2, '#737781')
     this.box(roof, -5.6, .75, -3.5, 2.8, 1.5, 1.1, '#59636e')
     this.box(roof, 5.2, .65, 1.8, 2.4, 1.3, 1.2, '#59636e')
+    this.addRoofGraphics(roof, 17, 15, '#ff8b45')
     // Enemy rooftop
     const far = new THREE.Group(); this.farRoof = far; far.position.set(0, 0, -12.5); this.scene.add(far)
     this.box(far, 0, -0.45, 0, 15, .9, 12, '#383d49')
@@ -194,6 +195,7 @@ export class RooftopArena {
     this.box(far, 0, .1, -5.8, 15, 1.3, .5, '#656a72')
     this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
+    this.addRoofGraphics(far, 15, 12, '#ffbd70')
     this.player = this.createFighter('volt')
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('vex')
@@ -203,6 +205,48 @@ export class RooftopArena {
     this.camera.position.set(0, 7.4, 20.2)
     this.camera.lookAt(0, 1.3, -9.4)
     this.applyArena(0)
+  }
+
+  private addRoofGraphics(parent: THREE.Group, width: number, depth: number, accentColor: string) {
+    const graphic = new THREE.Group()
+    graphic.position.y = .012
+    parent.add(graphic)
+    const ink = new THREE.MeshBasicMaterial({ color: '#202733' })
+    const accent = new THREE.MeshBasicMaterial({ color: accentColor })
+    const pale = new THREE.MeshBasicMaterial({ color: '#e8d9c3' })
+    const addMark = (w: number, d: number, x: number, z: number, material: THREE.Material, rotation = 0) => {
+      const mark = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material)
+      mark.rotation.x = -Math.PI / 2
+      mark.rotation.z = rotation
+      mark.position.set(x, 0, z)
+      graphic.add(mark)
+      return mark
+    }
+
+    // Painted rooftop lane graphics: decorative only, with no collision or gameplay effect.
+    addMark(width * .72, .035, 0, depth * .31, accent)
+    addMark(width * .72, .035, 0, -depth * .31, accent)
+    addMark(.045, depth * .58, -width * .43, 0, accent)
+    addMark(.045, depth * .58, width * .43, 0, accent)
+    addMark(2.5, .11, 0, depth * .22, ink)
+    addMark(1.7, .055, 0, depth * .22, pale)
+    // Directional chevrons along the rear edge give the roof a graphic arena identity.
+    for (let i = -2; i <= 2; i++) {
+      addMark(.72, .09, i * 1.15, -depth * .38, accent, Math.PI / 4)
+      addMark(.72, .09, i * 1.15, -depth * .38 - .32, accent, -Math.PI / 4)
+    }
+
+    // Low-profile LED edge strips stay flush with the roof surface.
+    const led = new THREE.MeshBasicMaterial({ color: accentColor, transparent: true, opacity: .88 })
+    const edge = (w: number, d: number, x: number, z: number) => {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(w, .035, d), led)
+      bar.position.set(x, .035, z)
+      graphic.add(bar)
+    }
+    edge(width * .68, .045, 0, depth * .47)
+    edge(width * .68, .045, 0, -depth * .47)
+    edge(.045, depth * .7, -width * .47, 0)
+    edge(.045, depth * .7, width * .47, 0)
   }
 
   private createFighter(character: 'volt' | 'vex') {
