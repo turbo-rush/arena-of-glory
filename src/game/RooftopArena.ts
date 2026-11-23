@@ -225,7 +225,7 @@ export class RooftopArena {
       for (let i = 1; i <= 3; i++) paint(group.children[i], trimColor)
       for (let i = coverStart; i <= coverEnd; i++) paint(group.children[i], coverColor)
     }
-    paintRoof(this.roof, arena.roof, arena.trim, arena.cover, 4, 7)
+    paintRoof(this.roof, arena.roof, arena.trim, arena.cover, 9, 10)
     paintRoof(this.farRoof, arena.roof, arena.trim, arena.cover, 4, 5)
   }
   private resetRoundState() {
