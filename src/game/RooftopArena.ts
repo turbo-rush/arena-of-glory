@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
-export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'VICTORY' | 'DEFEAT'; kills: number }
+export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string }
 type StateListener = (state: GameState) => void
 const WEAPONS: Record<WeaponId, { name: string; subtitle: string; magazine: number; reserve: number; damage: number; headMultiplier: number; spread: number; pellets: number }> = {
   pistol: { name: 'VX-9 SIDEARM', subtitle: 'SEMI-AUTO // 9MM', magazine: 12, reserve: 48, damage: 18, headMultiplier: 2.2, spread: .42, pellets: 1 },
@@ -10,6 +10,11 @@ const WEAPONS: Record<WeaponId, { name: string; subtitle: string; magazine: numb
   sniper: { name: 'M-90 LONGSHOT', subtitle: 'BOLT ACTION // .308', magazine: 5, reserve: 20, damage: 48, headMultiplier: 2.5, spread: .1, pellets: 1 }
 }
 const WEAPON_ORDER: WeaponId[] = ['pistol', 'rifle', 'shotgun', 'sniper']
+const ARENAS = [
+  { name: 'SKYLINE // GOLDEN HOUR', sky: '#9b9b9d', fog: '#9b9b9d', ground: '#4c5058', sun: '#ffe0b1', roof: '#353b46', trim: '#555a64', cover: '#59636e' },
+  { name: 'IRONWORKS // DUSK', sky: '#725d5b', fog: '#725d5b', ground: '#343b40', sun: '#ff9a67', roof: '#343b3d', trim: '#6a625c', cover: '#65534a' },
+  { name: 'NEON DISTRICT // NIGHT', sky: '#202b49', fog: '#202b49', ground: '#202737', sun: '#8ba8ff', roof: '#252d43', trim: '#53617c', cover: '#3b4965' }
+]
 
 export class RooftopArena {
   private scene = new THREE.Scene()
@@ -47,6 +52,17 @@ export class RooftopArena {
   private enemyPeekTimer = 0
   private enemyStrafeDirection = 1
   private enemyShotWindup = 0
+  private roundsWon = 0
+  private roundsLost = 0
+  private roundNumber = 1
+  private gameStatus: GameState['status'] = 'FIGHT'
+  private intermissionTimer = 0
+  private arenaIndex = 0
+  private roof!: THREE.Group
+  private farRoof!: THREE.Group
+  private ground!: THREE.Mesh
+  private sun!: THREE.DirectionalLight
+  private hemisphere!: THREE.HemisphereLight
   private readonly coverColliders = [
     new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
     new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
@@ -94,11 +110,11 @@ export class RooftopArena {
   }
 
   private buildWorld() {
-    this.scene.add(new THREE.HemisphereLight('#dceaff', '#33303b', 2.1))
-    const sun = new THREE.DirectionalLight('#ffe0b1', 3.2)
-    sun.position.set(-12, 24, 10); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); this.scene.add(sun)
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), this.material('#4c5058'))
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -3.1; ground.receiveShadow = true; this.scene.add(ground)
+    this.hemisphere = new THREE.HemisphereLight('#dceaff', '#33303b', 2.1); this.scene.add(this.hemisphere)
+    this.sun = new THREE.DirectionalLight('#ffe0b1', 3.2)
+    this.sun.position.set(-12, 24, 10); this.sun.castShadow = true; this.sun.shadow.mapSize.set(1024, 1024); this.scene.add(this.sun)
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), this.material('#4c5058'))
+    this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -3.1; this.ground.receiveShadow = true; this.scene.add(this.ground)
     // Distant city skyline
     for (let i = 0; i < 38; i++) {
       const x = (i % 10 - 5) * 8 + Math.sin(i * 4) * 2
@@ -109,7 +125,7 @@ export class RooftopArena {
       windows.position.set(2.05 + i % 3 * .5, 0, 2.03); b.add(windows)
     }
     // Player rooftop
-    const roof = new THREE.Group(); roof.position.set(0, 0, 5); this.scene.add(roof)
+    const roof = new THREE.Group(); this.roof = roof; roof.position.set(0, 0, 5); this.scene.add(roof)
     this.box(roof, 0, -0.45, 0, 17, .9, 15, '#353b46')
     this.box(roof, 0, .04, -7.2, 17, 1.2, .5, '#555a64')
     this.box(roof, -8.2, .04, 0, .5, 1.2, 15, '#555a64')
@@ -118,7 +134,7 @@ export class RooftopArena {
     this.box(roof, -5.6, .75, -3.5, 2.8, 1.5, 1.1, '#59636e')
     this.box(roof, 5.2, .65, 1.8, 2.4, 1.3, 1.2, '#59636e')
     // Enemy rooftop
-    const far = new THREE.Group(); far.position.set(0, 0, -12.5); this.scene.add(far)
+    const far = new THREE.Group(); this.farRoof = far; far.position.set(0, 0, -12.5); this.scene.add(far)
     this.box(far, 0, -0.45, 0, 15, .9, 12, '#383d49')
     this.box(far, -7.2, .1, 0, .5, 1.3, 12, '#656a72')
     this.box(far, 7.2, .1, 0, .5, 1.3, 12, '#656a72')
@@ -133,6 +149,7 @@ export class RooftopArena {
     // Camera follows just behind the player, looking toward the rival rooftop.
     this.camera.position.set(0, 7.4, 20.2)
     this.camera.lookAt(0, 1.3, -9.4)
+    this.applyArena(0)
   }
 
   private createFighter(jacket: string, pants: string) {
@@ -188,7 +205,49 @@ export class RooftopArena {
       addPart(.18, .14, .38, 0, -.04, .35)
     }
   }
-  start() { this.started = true }
+  start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
+  continueRound() { if (this.gameStatus === 'ROUND_BREAK') this.beginNextRound() }
+  private applyArena(index: number) {
+    this.arenaIndex = index % ARENAS.length
+    const arena = ARENAS[this.arenaIndex]
+    this.scene.background = new THREE.Color(arena.sky)
+    this.scene.fog = new THREE.Fog(arena.fog, 35, 115)
+    this.ground.material.color.set(arena.ground)
+    this.sun.color.set(arena.sun)
+    this.sun.intensity = this.arenaIndex === 2 ? 2.2 : 3.2
+    this.hemisphere.intensity = this.arenaIndex === 2 ? 1.35 : 2.1
+    const paintRoof = (group: THREE.Group, floorColor: string, trimColor: string, coverColor: string, coverStart: number, coverEnd: number) => {
+      const paint = (object: THREE.Object3D, color: string) => {
+        const mesh = object as THREE.Mesh
+        if (mesh.material && (mesh.material as THREE.MeshStandardMaterial).color) (mesh.material as THREE.MeshStandardMaterial).color.set(color)
+      }
+      paint(group.children[0], floorColor)
+      for (let i = 1; i <= 3; i++) paint(group.children[i], trimColor)
+      for (let i = coverStart; i <= coverEnd; i++) paint(group.children[i], coverColor)
+    }
+    paintRoof(this.roof, arena.roof, arena.trim, arena.cover, 4, 7)
+    paintRoof(this.farRoof, arena.roof, arena.trim, arena.cover, 4, 5)
+  }
+  private resetRoundState() {
+    this.health = 100; this.enemyHealth = 100
+    this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }
+    this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }
+    this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.reloadTimer = 0
+    this.aiming = false; this.crouched = false; this.peekDirection = 0
+    this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
+    this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
+    this.recoil = 0; this.player.position.set(0, 0, 2.3); this.enemy.position.set(1.4, 0, -1.7)
+    this.player.rotation.set(0, Math.PI, 0); this.enemy.rotation.set(0, Math.PI, 0)
+    this.player.userData.arm.rotation.x = 0; this.enemy.userData.arm.rotation.x = 0
+    this.keys.clear(); this.touchKeys.clear(); this.rebuildWeaponModel()
+  }
+  private beginNextRound() {
+    this.roundNumber++
+    this.resetRoundState()
+    this.applyArena((this.roundNumber - 1) % ARENAS.length)
+    this.intermissionTimer = 0; this.gameStatus = 'FIGHT'; this.started = true
+    this.publish()
+  }
   crouch() { this.crouched = !this.crouched }
   peek(direction: -1 | 1) { this.peekDirection = this.peekDirection === direction ? 0 : direction }
   setTouchKey(key: string, pressed: boolean) { pressed ? this.touchKeys.add(key) : this.touchKeys.delete(key) }
@@ -308,10 +367,24 @@ export class RooftopArena {
     arm.rotation.x = 1.05
     this.publish()
   }
-  reset() { this.health = 100; this.enemyHealth = 100; this.weapon = 'pistol'; this.ammoByWeapon = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5 }; this.reserveByWeapon = { pistol: 48, rifle: 120, shotgun: 30, sniper: 20 }; this.ammo = 12; this.reserveAmmo = 48; this.reloading = false; this.rebuildWeaponModel(); this.started = true; this.publish() }
-  private finish(status: 'VICTORY' | 'DEFEAT') { this.started = false; this.publish(status) }
-  private publish(status: GameState['status'] = 'FIGHT') {
-    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: this.reloading, status, kills: status === 'VICTORY' ? 1 : 0 })
+  reset() {
+    this.roundsWon = 0; this.roundsLost = 0; this.roundNumber = 1
+    this.resetRoundState(); this.applyArena(0); this.intermissionTimer = 0
+    this.gameStatus = 'FIGHT'; this.started = true; this.publish()
+  }
+  private finish(status: 'VICTORY' | 'DEFEAT') {
+    this.started = false
+    if (status === 'VICTORY') this.roundsWon++
+    else this.roundsLost++
+    if (this.roundsWon >= 3 || this.roundsLost >= 3) {
+      this.gameStatus = this.roundsWon >= 3 ? 'VICTORY' : 'DEFEAT'
+    } else {
+      this.gameStatus = 'ROUND_BREAK'; this.intermissionTimer = 2.8
+    }
+    this.publish()
+  }
+  private publish(status: GameState['status'] = this.gameStatus) {
+    this.listener({ health: this.health, enemyHealth: this.enemyHealth, ammo: this.ammo, reserveAmmo: this.reserveAmmo, weapon: this.weapon, reloading: this.reloading, status, kills: this.roundsWon, roundsWon: this.roundsWon, roundsLost: this.roundsLost, roundNumber: this.roundNumber, arenaName: ARENAS[this.arenaIndex].name })
   }
 
   private resize() {
@@ -335,6 +408,10 @@ export class RooftopArena {
           this.impactParticles.splice(i, 1)
         }
       }
+    }
+    if (!this.started && this.gameStatus === 'ROUND_BREAK') {
+      this.intermissionTimer -= dt
+      if (this.intermissionTimer <= 0) this.beginNextRound()
     }
     if (this.started) {
       if (this.reloading) {
