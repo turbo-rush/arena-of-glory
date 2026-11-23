@@ -20,6 +20,11 @@ export class RooftopArena {
   private started = false
   private disposed = false
   private aiming = false
+  private walkTime = 0
+  private enemyWalkTime = 0
+  private recoil = 0
+  private muzzleTimer = 0
+  private tracer: THREE.Line | null = null
   private listener: StateListener
   private host: HTMLElement
   private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload() }
@@ -90,8 +95,8 @@ export class RooftopArena {
     this.enemy = this.createFighter('#d64f48', '#20232d')
     this.enemy.position.set(1.4, 0, -2.5); far.add(this.enemy)
     // Camera follows just behind the player, looking toward the rival rooftop.
-    this.camera.position.set(0, 5.6, 12.5)
-    this.camera.lookAt(0, 1.2, -13)
+    this.camera.position.set(0, 6.4, 17.2)
+    this.camera.lookAt(0, 1.35, -10.5)
   }
 
   private createFighter(jacket: string, pants: string) {
@@ -99,13 +104,18 @@ export class RooftopArena {
     const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), this.material(jacket)); torso.position.y = 1.2; torso.castShadow = true; group.add(torso)
     const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 8, 7), this.material('#c58f70')); head.position.y = 1.93; head.castShadow = true; group.add(head)
     const hood = new THREE.Mesh(new THREE.BoxGeometry(.57, .18, .5), this.material(pants)); hood.position.set(0, 2.08, -.03); group.add(hood)
+    const legs: THREE.Mesh[] = []
     for (const x of [-.2, .2]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), this.material(pants)); leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg)
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), this.material(pants)); leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
     }
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), this.material(jacket)); arm.position.set(.43, 1.12, -.1); arm.rotation.x = -.8; arm.rotation.z = -.15; group.add(arm)
-    const gun = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, .72), this.material('#20242b', .4)); gun.position.set(.46, 1.04, -.52); group.add(gun)
-    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.09, 6, 5), new THREE.MeshBasicMaterial({ color: '#ffca71' })); muzzle.position.set(.46, 1.03, -.9); muzzle.visible = false; group.add(muzzle)
+    const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
+    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), this.material(jacket)); armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, .72), this.material('#20242b', .4)); gun.position.set(.03, -.38, -.48); arm.add(gun)
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ffca71', emissive: '#ff8b32', emissiveIntensity: 2 })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
+    group.userData.arm = arm
+    group.userData.legs = legs
+    group.userData.baseY = 0
     return group
   }
 
@@ -115,16 +125,33 @@ export class RooftopArena {
   shoot() {
     if (!this.started || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
-    const hit = Math.random() > .28
-    if (hit) this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 24 : 14))
+    const hit = Math.random() > (this.aiming ? .08 : .24)
+    if (hit) this.enemyHealth = Math.max(0, this.enemyHealth - (this.aiming ? 25 : 16))
+    this.recoil = 1
     this.flash(this.player)
+    this.showTracer(hit)
     this.publish()
     if (this.enemyHealth === 0) this.finish('VICTORY')
   }
   private flash(fighter: THREE.Group) {
     const muzzle = fighter.userData.muzzle as THREE.Mesh
     muzzle.visible = true
-    window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, 90)
+    const arm = fighter.userData.arm as THREE.Group | undefined
+    if (arm) arm.rotation.x = -.18
+    window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, 85)
+  }
+
+  private showTracer(hit: boolean) {
+    if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer = null }
+    const start = new THREE.Vector3(); const end = new THREE.Vector3()
+    this.player.localToWorld(start.set(.46, 1.04, .35))
+    this.enemy.localToWorld(end.set(0, 1.2, 0))
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
+    const material = new THREE.LineBasicMaterial({ color: hit ? '#ffd18a' : '#9ba9b8', transparent: true, opacity: .9 })
+    this.tracer = new THREE.Line(geometry, material); this.scene.add(this.tracer)
+    window.setTimeout(() => {
+      if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose(); this.tracer = null }
+    }, 110)
   }
   reload() {
     if (this.ammo === 12 || !this.started) return
@@ -146,18 +173,34 @@ export class RooftopArena {
     this.frame = requestAnimationFrame(this.animate)
     const dt = Math.min(this.clock.getDelta(), .04)
     if (this.started) {
-      const speed = 5.2 * dt
+      const speed = 4.4 * dt
       const forward = this.keys.has('KeyW') || this.touchKeys.has('KeyW')
       const back = this.keys.has('KeyS') || this.touchKeys.has('KeyS')
       const left = this.keys.has('KeyA') || this.touchKeys.has('KeyA')
       const right = this.keys.has('KeyD') || this.touchKeys.has('KeyD')
+      const moving = forward || back || left || right
       if (forward) this.player.position.z -= speed
       if (back) this.player.position.z += speed
       if (left) this.player.position.x -= speed
       if (right) this.player.position.x += speed
+      if (moving) this.walkTime += dt * 10
       this.player.position.x = THREE.MathUtils.clamp(this.player.position.x, -6.8, 6.8)
       this.player.position.z = THREE.MathUtils.clamp(this.player.position.z, -1.8, 6.5)
       this.player.rotation.y = Math.PI
+      const playerLegs = this.player.userData.legs as THREE.Mesh[]
+      playerLegs.forEach((leg, index) => { leg.rotation.x = moving ? Math.sin(this.walkTime + index * Math.PI) * .62 : THREE.MathUtils.damp(leg.rotation.x, 0, 9, dt) })
+      this.player.position.y = moving ? Math.abs(Math.sin(this.walkTime * 2)) * .07 : 0
+      const playerArm = this.player.userData.arm as THREE.Group
+      playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
+      this.recoil = Math.max(0, this.recoil - dt * 5)
+      this.enemyWalkTime += dt
+      const enemyBaseX = 1.4
+      this.enemy.position.x = enemyBaseX + Math.sin(this.enemyWalkTime * .72) * 1.65
+      const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
+      enemyLegs.forEach((leg, index) => { leg.rotation.x = Math.sin(this.enemyWalkTime * 4 + index * Math.PI) * .22 })
+      this.enemy.rotation.y = Math.PI
+      this.enemy.position.y = Math.abs(Math.sin(this.enemyWalkTime * 2)) * .035
+      this.enemy.userData.arm.rotation.x = THREE.MathUtils.damp(this.enemy.userData.arm.rotation.x, 0, 8, dt)
       this.enemyTimer += dt
       if (this.enemyTimer > 2.8 && this.enemyHealth > 0) {
         this.enemyTimer = 0
@@ -168,13 +211,18 @@ export class RooftopArena {
         }
       }
     }
-    this.camera.position.x += (this.player.position.x * .24 - this.camera.position.x) * .035
-    this.camera.lookAt(this.player.position.x * .12, 1.2, -13)
+    this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 5.8 : 6.4, 5, dt)
+    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 15.9 : 17.2, 5, dt)
+    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 45 : 52, 6, dt)
+    this.camera.updateProjectionMatrix()
+    this.camera.lookAt(this.player.position.x * .12, 1.35, -10.5)
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
     this.disposed = true; cancelAnimationFrame(this.frame); this.resizeObserver.disconnect()
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp)
+    if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose() }
     this.renderer.dispose(); this.host.removeChild(this.renderer.domElement)
   }
 }
