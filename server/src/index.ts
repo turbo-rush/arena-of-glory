@@ -233,10 +233,30 @@ export class DuelRoom {
         this.broadcast({ ...message, hit: damage > 0 }, socket)
         break
       }
-      case "reload":
-      case "switch_weapon":
-        if (this.phase === "fighting") this.broadcast(message, socket)
+      case "reload": {
+        if (this.phase !== "fighting" || Date.now() < player.reloadUntil) break
+        const current = player.weapon
+        const missing = MAGAZINES[current] - player.ammo[current]
+        if (missing <= 0 || player.reserve[current] <= 0) break
+        const transfer = Math.min(missing, player.reserve[current])
+        player.ammo[current] += transfer
+        player.reserve[current] -= transfer
+        player.reloadUntil = Date.now() + 1150
+        const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
+        socket.serializeAttachment({ ...(attachment ?? {}), ammo: player.ammo, reserve: player.reserve, weapon: player.weapon, reloadUntil: player.reloadUntil })
+        socket.send(JSON.stringify({ type: "loadout_update", weapon: current, ammo: player.ammo[current], reserveAmmo: player.reserve[current], reloading: true }))
+        this.broadcast({ type: "reload", weapon: current }, socket)
         break
+      }
+      case "switch_weapon": {
+        if (this.phase !== "fighting" || Date.now() < player.reloadUntil || !["pistol", "rifle", "shotgun", "sniper"].includes(String(message.weapon))) break
+        player.weapon = message.weapon as WeaponId
+        const attachment = socket.deserializeAttachment() as Record<string, unknown> | null
+        socket.serializeAttachment({ ...(attachment ?? {}), weapon: player.weapon, ammo: player.ammo, reserve: player.reserve })
+        socket.send(JSON.stringify({ type: "loadout_update", weapon: player.weapon, ammo: player.ammo[player.weapon], reserveAmmo: player.reserve[player.weapon], reloading: false }))
+        this.broadcast({ type: "switch_weapon", weapon: player.weapon }, socket)
+        break
+      }
       case "ping":
         socket.send(JSON.stringify({ type: "pong", clientTime: Number(message.clientTime) || 0, serverTime: Date.now() }))
         break
