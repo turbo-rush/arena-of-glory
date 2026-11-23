@@ -49,14 +49,17 @@ export default function App() {
         setStarted(true)
         gameRef.current?.startOnline(
           input => transport.send({ type: 'input', input }),
-          weapon => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw: 0, aimPitch: 0 })
+          (weapon, aimYaw, aimPitch) => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw, aimPitch })
         )
       } else if (message.type === 'input') {
         gameRef.current?.applyRemoteInput(message.input)
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
-      } else if (message.type === 'shot_result' && !message.accepted) {
-        gameRef.current?.rejectOnlineShot()
+      } else if (message.type === 'shot_result') {
+        if (!message.accepted) gameRef.current?.rejectOnlineShot()
+        else gameRef.current?.applyOnlineShotResult(message.damage > 0, message.damage, message.targetHealth, message.hitZone)
+      } else if (message.type === 'health_update') {
+        gameRef.current?.applyOnlineDamage(message.health, message.damage, message.hitZone)
       } else if (message.type === 'error') {
         setRoomError(message.message)
       }
