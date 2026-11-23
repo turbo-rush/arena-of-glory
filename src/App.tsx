@@ -59,6 +59,10 @@ export default function App() {
         gameRef.current?.applyRemoteFire()
       } else if (message.type === 'loadout_update') {
         gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
+      } else if (message.type === 'switch_weapon') {
+        gameRef.current?.applyRemoteWeaponSwitch(message.weapon)
+      } else if (message.type === 'reload') {
+        gameRef.current?.applyRemoteReload(message.weapon)
       } else if (message.type === 'shot_result') {
         if (!message.accepted) gameRef.current?.rejectOnlineShot()
         else gameRef.current?.applyOnlineShotResult(message.damage > 0, message.damage, message.targetHealth, message.hitZone)
