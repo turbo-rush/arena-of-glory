@@ -5,7 +5,7 @@ import { RooftopArena, type GameState } from './game/RooftopArena'
 export default function App() {
   const mountRef = useRef<HTMLDivElement>(null)
   const gameRef = useRef<RooftopArena | null>(null)
-  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0 })
+  const [state, setState] = useState<GameState>({ health: 100, enemyHealth: 100, ammo: 12, reserveAmmo: 48, weapon: 'pistol', reloading: false, status: 'FIGHT', kills: 0, roundsWon: 0, roundsLost: 0, roundNumber: 1, arenaName: 'SKYLINE // GOLDEN HOUR' })
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
 
@@ -26,7 +26,7 @@ export default function App() {
       <div className="vignette" />
       <header className="topbar">
         <div className="brand"><span className="brand-mark">A</span><div><b>ARENA <i>OF</i> GLORY</b><small>ROOFTOP COMBAT // SECTOR 07</small></div></div>
-        <div className="match-tag"><span className="live-dot" /> LIVE DUEL <strong>01:42</strong></div>
+        <div className="match-tag"><span className="live-dot" /> ROUND {state.roundNumber}/5 <strong>{state.roundsWon} : {state.roundsLost}</strong></div>
       </header>
 
       <section className="hud">
@@ -43,7 +43,7 @@ export default function App() {
         </div>
       </section>
 
-      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>ELIMINATE THE TARGET</b><small>Move · Aim · Fire</small></div></div>
+      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>{state.arenaName}</b><small>FIRST TO 3 WINS THE MATCH</small></div></div>
 
       <div className="weapon-panel">
         <div className="weapon-icon">✦</div>
@@ -63,7 +63,7 @@ export default function App() {
       </div>
 
       {!started && <div className="start-overlay"><div className="start-card"><div className="eyebrow">THE CITY IS YOUR BATTLEFIELD</div><h1>OWN THE<br/><em>ROOFTOPS.</em></h1><p>One opponent. One rooftop. No second chances.</p><button onClick={() => { setStarted(true); gameRef.current?.start() }}>ENTER THE ARENA <span>→</span></button><small>PROTOTYPE BUILD 0.1 // TRAINING MATCH</small></div></div>}
-      {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">DUEL COMPLETE</div><h2>{state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT'}</h2><button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>PLAY AGAIN</button></div>}
+      {state.status !== 'FIGHT' && <div className="result-overlay"><div className="eyebrow">{state.status === 'ROUND_BREAK' ? `ROUND ${state.roundNumber} COMPLETE` : 'MATCH COMPLETE'}</div><h2>{state.status === 'ROUND_BREAK' ? (state.roundsWon > state.roundsLost ? 'ROUND WON' : 'ROUND LOST') : (state.status === 'VICTORY' ? 'VICTORY' : 'DEFEAT')}</h2><p className="round-score">{state.roundsWon} <span>—</span> {state.roundsLost}</p>{state.status === 'ROUND_BREAK' ? <button onClick={() => gameRef.current?.continueRound()}>NEXT ROUND <span>→</span></button> : <button onClick={() => { gameRef.current?.reset(); setStarted(true) }}>REMATCH</button>}</div>}
       <footer className="footer"><span><Shield size={13}/> TRAINING SIMULATION</span><span>ARENA OF GLORY <b>© 2026</b></span><button onClick={() => setMuted(!muted)}>{muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}</button></footer>
     </main>
   )
