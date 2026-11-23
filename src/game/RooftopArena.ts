@@ -111,7 +111,7 @@ export class RooftopArena {
     const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
     const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), this.material(jacket)); armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
     const gun = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, .72), this.material('#20242b', .4)); gun.position.set(.03, -.38, -.48); arm.add(gun)
-    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ffca71', emissive: '#ff8b32', emissiveIntensity: 2 })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
+    const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
     group.userData.arm = arm
     group.userData.legs = legs
