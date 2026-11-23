@@ -109,7 +109,7 @@ export class DuelRoom {
       let player: Player
       if (resumed) {
         const resumeToken = crypto.randomUUID() + crypto.randomUUID()
-        player = { ...resumed, id: String(resumed.playerId), socket: server, resumeToken } as Player
+        player = { ...resumed, id: String(resumed.playerId), lastInputAt: Number.isFinite(resumed.lastInputAt) ? Number(resumed.lastInputAt) : Date.now(), socket: server, resumeToken } as Player
         this.players.set(player.id, player)
         this.phase = await this.state.storage.get<typeof this.phase>("roomPhase") ?? this.phase
         server.serializeAttachment({ ...resumed, resumeToken })
