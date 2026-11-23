@@ -1,0 +1,11 @@
+name = "arena-of-glory-duel"
+main = "src/index.ts"
+compatibility_date = "2026-11-23"
+
+[[durable_objects.bindings]]
+name = "DUEL_ROOMS"
+class_name = "DuelRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DuelRoom"]
