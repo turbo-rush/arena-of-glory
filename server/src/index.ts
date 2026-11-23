@@ -94,8 +94,10 @@ export class DuelRoom {
       const slot = (this.players.size + 1) as 1 | 2
       const name = (url.searchParams.get("name") ?? (slot === 1 ? "PLAYER 1" : "PLAYER 2")).slice(0, 20)
       this.state.acceptWebSocket(server)
-      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
-      server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0 })
+      const ammo = { ...MAGAZINES }
+      const reserve = { ...RESERVES }
+      this.players.set(playerId, { id: playerId, name, ready: false, socket: server, slot, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, roundWins: 0, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 })
+      server.serializeAttachment({ playerId, name, slot, ready: false, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, health: 100, shotTimes: {}, lastShotId: 0, lastInputSeq: 0, weapon: "pistol", ammo, reserve, reloadUntil: 0 })
       server.send(JSON.stringify({ type: "welcome", playerId, roomCode: this.roomCode, slot }))
       this.updatePhase()
       this.broadcastRoomState()
