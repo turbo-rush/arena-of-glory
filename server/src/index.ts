@@ -303,7 +303,30 @@ export class DuelRoom {
     this.restorePlayers()
     await this.restorePendingPlayers()
     const attachment = socket.deserializeAttachment() as Record<string, any> | null
-    const player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
+    let player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
+    if (!player && attachment?.playerId) {
+      player = {
+        ...attachment,
+        id: attachment.playerId,
+        socket,
+        resumeToken: attachment.resumeToken ?? crypto.randomUUID(),
+        slot: attachment.slot === 2 ? 2 : 1,
+        x: attachment.x ?? 0,
+        z: attachment.z ?? 2.3,
+        yaw: attachment.yaw ?? Math.PI,
+        pitch: attachment.pitch ?? 0,
+        health: attachment.health ?? 100,
+        roundWins: attachment.roundWins ?? 0,
+        shotTimes: attachment.shotTimes ?? {},
+        lastShotId: attachment.lastShotId ?? 0,
+        lastInputSeq: attachment.lastInputSeq ?? 0,
+        weapon: attachment.weapon ?? "pistol",
+        ammo: attachment.ammo ?? { ...MAGAZINES },
+        reserve: attachment.reserve ?? { ...RESERVES },
+        reloadUntil: attachment.reloadUntil ?? 0,
+      } as Player
+      this.players.set(player.id, player)
+    }
     if (!player || player.socket !== socket) return
     player.socket = null
     if (code === 1000 && reason === "player_left") {
