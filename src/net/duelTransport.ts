@@ -75,6 +75,8 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
     case 'match_started':
       return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime)
         ? value as ServerDuelMessage : null
+    case 'round_started':
+      return isNumber(value.roundNumber) && isNumber(value.serverTime) ? value as ServerDuelMessage : null
     case 'input': {
       if (!isRecord(value.input)) return null
       const input = value.input
