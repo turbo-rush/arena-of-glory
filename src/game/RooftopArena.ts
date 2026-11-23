@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { DuelInput } from '../net/duelTransport'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
 export type GameState = { health: number; enemyHealth: number; ammo: number; reserveAmmo: number; weapon: WeaponId; reloading: boolean; status: 'FIGHT' | 'ROUND_BREAK' | 'VICTORY' | 'DEFEAT'; kills: number; roundsWon: number; roundsLost: number; roundNumber: number; arenaName: string; hitFeedback: 'HEADSHOT' | 'HIT' | 'EXPLOSION' | ''; hitFeedbackId: number; damageFlashId: number }
@@ -22,6 +23,11 @@ export class RooftopArena {
   private renderer: THREE.WebGLRenderer
   private player!: THREE.Group
   private enemy!: THREE.Group
+  private onlineMode = false
+  private networkTimer = 0
+  private inputSequence = 0
+  private onLocalInput?: (input: DuelInput) => void
+  private remoteCrouched = false
   private keys = new Set<string>()
   private touchKeys = new Set<string>()
   private clock = new THREE.Clock()
@@ -243,6 +249,37 @@ export class RooftopArena {
     }
   }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
+  startOnline(onLocalInput: (input: DuelInput) => void) {
+    this.onlineMode = true
+    this.onLocalInput = onLocalInput
+    this.networkTimer = 0
+    this.inputSequence = 0
+    this.started = true
+    this.gameStatus = 'FIGHT'
+    this.enemyHealth = 100
+    this.publish()
+  }
+  stopOnline() {
+    this.onlineMode = false
+    this.onLocalInput = undefined
+    this.started = false
+  }
+  applyRemoteInput(input: DuelInput) {
+    if (!this.onlineMode) return
+    this.enemy.position.x = THREE.MathUtils.clamp(input.moveX, -6.8, 6.8)
+    this.enemy.position.z = THREE.MathUtils.clamp(input.moveZ, -1.8, 6.5)
+    this.remoteCrouched = input.crouched
+    this.enemy.position.y = input.crouched ? -.32 : 0
+    this.enemy.rotation.y = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
+    const legs = this.enemy.userData.legs as THREE.Mesh[]
+    legs.forEach((leg, index) => { leg.rotation.x = Math.sin(input.clientTime / 110 + index * Math.PI) * (Math.abs(input.moveX) + Math.abs(input.moveZ) > .1 ? .35 : .02) })
+  }
+  applyRemoteFire() {
+    if (!this.onlineMode) return
+    const muzzle = this.enemy.userData.muzzle as THREE.Mesh
+    muzzle.visible = true
+    window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, 90)
+  }
   continueRound() { if (this.gameStatus === 'ROUND_BREAK') this.beginNextRound() }
   private applyArena(index: number) {
     this.arenaIndex = index % ARENAS.length
@@ -325,6 +362,13 @@ export class RooftopArena {
   shoot() {
     if (!this.started || this.reloading || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
     this.ammo--
+    if (this.onlineMode) {
+      this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
+      this.flash(this.player)
+      this.showTracer(false)
+      this.publish()
+      return
+    }
     const config = WEAPONS[this.weapon]
     const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
     let totalDamage = 0
@@ -509,6 +553,7 @@ export class RooftopArena {
       const recoilKick = this.weapon === 'sniper' ? .48 : this.weapon === 'shotgun' ? .38 : this.weapon === 'rifle' ? .24 : .3
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * recoilKick
       this.recoil = Math.max(0, this.recoil - dt * 5)
+      if (!this.onlineMode) {
       this.enemyWalkTime += dt
       const playerDeltaX = this.player.position.x - this.previousPlayerPosition.x
       const playerDeltaZ = this.player.position.z - this.previousPlayerPosition.z
@@ -640,6 +685,27 @@ export class RooftopArena {
           const reactionWindup = (this.weapon === 'sniper' ? .27 : .32) * (rivalStyle === 0 ? .82 : rivalStyle === 1 ? 1.18 : .92)
           if (Math.random() > .04 && (!this.enemyCovering || this.enemyPeeking)) this.enemyShotWindup = reactionWindup
         }
+      }
+      } else {
+        this.enemyWalkTime += dt
+        this.networkTimer += dt
+        if (this.networkTimer >= 0.05) {
+          this.networkTimer = 0
+          this.onLocalInput?.({
+            seq: ++this.inputSequence,
+            clientTime: Date.now(),
+            moveX: this.player.position.x,
+            moveZ: this.player.position.z,
+            lookYaw: this.player.rotation.y,
+            lookPitch: 0,
+            crouched: this.crouched,
+            aiming: this.aiming
+          })
+        }
+        const remoteLegs = this.enemy.userData.legs as THREE.Mesh[]
+        remoteLegs.forEach((leg, index) => {
+          leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.remoteCrouched ? -.62 : Math.sin(this.enemyWalkTime * 1.8 + index * Math.PI) * .025, 8, dt)
+        })
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
