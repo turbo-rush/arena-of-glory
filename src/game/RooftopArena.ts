@@ -543,6 +543,10 @@ export class RooftopArena {
   reload() {
     const config = WEAPONS[this.weapon]
     if (this.reloading || this.ammo === config.magazine || this.reserveAmmo <= 0 || !this.started) return
+    if (this.onlineMode) {
+      this.onLocalReload?.()
+      return
+    }
     this.reloading = true
     this.reloadTimer = this.reloadDuration
     const arm = this.player.userData.arm as THREE.Group
