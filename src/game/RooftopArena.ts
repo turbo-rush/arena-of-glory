@@ -63,6 +63,7 @@ export class RooftopArena {
   private enemyFlankCooldown = 0
   private enemyFlankSide = 1
   private previousPlayerPosition = new THREE.Vector3(0, 0, 2.3)
+  private playerVelocity = new THREE.Vector3()
   private roundsWon = 0
   private roundsLost = 0
   private roundNumber = 1
@@ -271,7 +272,7 @@ export class RooftopArena {
     this.enemyTimer = 0; this.enemyShotWindup = 0; this.enemyCoverTimer = 0; this.enemyPeekTimer = 0
     this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
     this.playerCampTimer = 0; this.enemyFlankTimer = 0; this.enemyFlankCooldown = 0
-    this.previousPlayerPosition.set(0, 0, 2.3)
+    this.previousPlayerPosition.set(0, 0, 2.3); this.playerVelocity.set(0, 0, 0)
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
     this.recoil = 0; this.player.position.set(0, 0, 2.3); this.enemy.position.set(1.4, 0, -1.7)
     this.player.rotation.set(0, Math.PI, 0); this.enemy.rotation.set(0, Math.PI, 0)
@@ -504,7 +505,10 @@ export class RooftopArena {
       playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * recoilKick
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
-      const playerDisplacement = Math.hypot(this.player.position.x - this.previousPlayerPosition.x, this.player.position.z - this.previousPlayerPosition.z)
+      const playerDeltaX = this.player.position.x - this.previousPlayerPosition.x
+      const playerDeltaZ = this.player.position.z - this.previousPlayerPosition.z
+      const playerDisplacement = Math.hypot(playerDeltaX, playerDeltaZ)
+      this.playerVelocity.set(playerDeltaX / Math.max(dt, .001), 0, playerDeltaZ / Math.max(dt, .001))
       this.previousPlayerPosition.copy(this.player.position)
       this.enemyFlankCooldown = Math.max(0, this.enemyFlankCooldown - dt)
       if (this.isPlayerProtected() && playerDisplacement < .035) this.playerCampTimer += dt
@@ -580,6 +584,11 @@ export class RooftopArena {
           const protectedByCover = this.isPlayerProtected()
           const enemyOrigin = new THREE.Vector3(); this.enemy.localToWorld(enemyOrigin.set(.46, 1.04, .35))
           const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, this.crouched ? .78 : 1.2, 0))
+          // Lead a moving target slightly so sustained lateral movement remains useful but not invulnerable.
+          const leadTime = this.weapon === 'shotgun' ? .1 : this.weapon === 'sniper' ? .2 : .16
+          playerTarget.addScaledVector(this.playerVelocity, leadTime)
+          playerTarget.x = THREE.MathUtils.clamp(playerTarget.x, -6.8, 6.8)
+          playerTarget.z = THREE.MathUtils.clamp(playerTarget.z, 3.2, 11.5)
           const clearShot = this.hasLineOfSight(enemyOrigin, playerTarget)
           if (!protectedByCover && clearShot && !this.isEnemyProtected()) {
             // Movement and active peeking are meaningful defensive actions, not just animation.
