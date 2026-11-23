@@ -155,6 +155,7 @@ export class DuelWebSocketTransport {
   get connectionState(): DuelConnectionState { return this.state }
   get roundTripMs(): number | null { return this.lastRoundTripMs }
   get reconnecting(): boolean { return this.shouldReconnect && Date.now() - this.reconnectStartedAt < 60_000 }
+  get reconnectUrl(): string { return this.url }
 
   onMessage(listener: Listener<ServerDuelMessage>): () => void {
     this.messageListeners.add(listener)
@@ -267,6 +268,20 @@ export class DuelWebSocketTransport {
       throw new Error('Cannot send duel data while disconnected')
     }
     this.socket.send(JSON.stringify(message))
+  }
+
+  /** Closes the page's socket without telling the room the player intentionally left. */
+  suspend(): void {
+    this.shouldReconnect = false
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    const socket = this.socket
+    this.socket = null
+    this.stopHeartbeat()
+    if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1001, 'page_suspend')
+    this.setState('disconnected')
   }
 
   close(): void {
