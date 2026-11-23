@@ -19,6 +19,7 @@ export type ClientDuelMessage =
   | { type: 'create_room'; protocol: typeof DUEL_PROTOCOL_VERSION; displayName: string }
   | { type: 'join_room'; protocol: typeof DUEL_PROTOCOL_VERSION; roomCode: string; displayName: string }
   | { type: 'set_ready'; ready: boolean }
+  | { type: 'continue_round' }
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
   | { type: 'reload' }
