@@ -42,7 +42,7 @@ export type ServerDuelMessage =
   | { type: 'switch_weapon'; weapon: WeaponId }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
-  | { type: 'resume_state'; phase: DuelPhase; health: number; x: number; z: number; yaw: number; pitch: number; roundWins: number; opponentWins: number }
+  | { type: 'resume_state'; phase: DuelPhase; health: number; x: number; z: number; yaw: number; pitch: number; roundWins: number; opponentWins: number; lastInputSeq: number }
   | { type: 'pong'; clientTime: number; serverTime: number }
   | { type: 'error'; code: string; message: string }
 
@@ -118,7 +118,7 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
         ? value as ServerDuelMessage : null
     case 'resume_state':
       return ['waiting', 'ready', 'fighting', 'round_break', 'finished'].includes(String(value.phase)) &&
-        isNumber(value.health) && isNumber(value.x) && isNumber(value.z) && isNumber(value.yaw) && isNumber(value.pitch) && isNumber(value.roundWins) && isNumber(value.opponentWins)
+        isNumber(value.health) && isNumber(value.x) && isNumber(value.z) && isNumber(value.yaw) && isNumber(value.pitch) && isNumber(value.roundWins) && isNumber(value.opponentWins) && isNumber(value.lastInputSeq)
         ? value as ServerDuelMessage : null
     case 'pong':
       return isNumber(value.clientTime) && isNumber(value.serverTime) ? value as ServerDuelMessage : null
