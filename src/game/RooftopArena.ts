@@ -526,6 +526,11 @@ export class RooftopArena {
   }
   switchWeapon() {
     if (this.reloading) return
+    if (this.onlineMode) {
+      const index = WEAPON_ORDER.indexOf(this.weapon)
+      this.onLocalSwitchWeapon?.(WEAPON_ORDER[(index + 1) % WEAPON_ORDER.length])
+      return
+    }
     this.ammoByWeapon[this.weapon] = this.ammo
     this.reserveByWeapon[this.weapon] = this.reserveAmmo
     const index = WEAPON_ORDER.indexOf(this.weapon)
