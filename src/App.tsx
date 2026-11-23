@@ -20,6 +20,7 @@ export default function App() {
   const transportRef = useRef<DuelWebSocketTransport | null>(null)
   const shotSequenceRef = useRef(0)
   const onlineModeRef = useRef(false)
+  const pendingResumeLoadoutRef = useRef<Extract<ServerDuelMessage, { type: 'loadout_update' }> | null>(null)
   const resumeStorageKey = 'arena-of-glory:duel-resume'
 
   useEffect(() => {
@@ -75,10 +76,16 @@ export default function App() {
           onlineModeRef.current = true
         }
         gameRef.current?.applyOnlineResume(message.health, message.phase, message.roundWins, message.opponentWins, message.x, message.z)
+        if (pendingResumeLoadoutRef.current) {
+          const loadout = pendingResumeLoadoutRef.current
+          gameRef.current?.applyOnlineLoadout(loadout.weapon, loadout.ammo, loadout.reserveAmmo, loadout.reloading)
+          pendingResumeLoadoutRef.current = null
+        }
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
         setStarted(message.phase === 'fighting' || message.phase === 'round_break')
       } else if (message.type === 'loadout_update') {
-        gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
+        if (onlineModeRef.current) gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
+        else pendingResumeLoadoutRef.current = message
       } else if (message.type === 'switch_weapon') {
         gameRef.current?.applyRemoteWeaponSwitch(message.weapon)
       } else if (message.type === 'reload') {
