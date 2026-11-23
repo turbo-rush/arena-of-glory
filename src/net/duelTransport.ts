@@ -101,6 +101,8 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
         (value.hitZone === null || value.hitZone === 'head' || value.hitZone === 'body') &&
         isNumber(value.damage) && (value.targetHealth === null || isNumber(value.targetHealth)) &&
         typeof value.accepted === 'boolean' ? value as ServerDuelMessage : null
+    case 'loadout_update':
+      return isWeapon(value.weapon) && isNumber(value.ammo) && isNumber(value.reserveAmmo) && typeof value.reloading === 'boolean' ? value as ServerDuelMessage : null
     case 'round_ended':
     case 'match_ended':
       return (value.winnerPlayerId === null || isString(value.winnerPlayerId)) &&
