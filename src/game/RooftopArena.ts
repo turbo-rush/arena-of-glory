@@ -295,9 +295,11 @@ export class RooftopArena {
     if (weapon !== this.remoteWeapon) this.applyRemoteWeaponSwitch(weapon)
     this.remoteReloadTimer = this.reloadDuration
   }
-  applyOnlineResume(health: number, phase: 'waiting' | 'ready' | 'fighting' | 'round_break' | 'finished', roundsWon: number, roundsLost: number) {
+  applyOnlineResume(health: number, phase: 'waiting' | 'ready' | 'fighting' | 'round_break' | 'finished', roundsWon: number, roundsLost: number, x?: number, z?: number) {
     if (!this.onlineMode) return
     this.health = THREE.MathUtils.clamp(health, 0, 100)
+    if (Number.isFinite(x)) this.player.position.x = THREE.MathUtils.clamp(x as number, -6.8, 6.8)
+    if (Number.isFinite(z)) this.player.position.z = THREE.MathUtils.clamp(z as number, -1.8, 6.5)
     this.roundsWon = Math.max(0, roundsWon)
     this.roundsLost = Math.max(0, roundsLost)
     this.roundNumber = Math.min(5, this.roundsWon + this.roundsLost + 1)
