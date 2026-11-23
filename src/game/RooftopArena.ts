@@ -264,7 +264,8 @@ export class RooftopArena {
     this.player.localToWorld(start.set(.46, 1.04, .35))
     this.enemy.localToWorld(end.set(0, 1.2, 0))
     const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
-    const material = new THREE.LineBasicMaterial({ color: hit ? '#ffd18a' : '#9ba9b8', transparent: true, opacity: .9 })
+    const tracerColor = this.weapon === 'sniper' ? '#9fe8ff' : this.weapon === 'shotgun' ? '#ffb45f' : this.weapon === 'rifle' ? '#ffdf8a' : '#ffd18a'
+    const material = new THREE.LineBasicMaterial({ color: hit ? tracerColor : '#9ba9b8', transparent: true, opacity: .9 })
     this.tracer = new THREE.Line(geometry, material); this.scene.add(this.tracer)
     window.setTimeout(() => {
       if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose(); this.tracer = null }
