@@ -147,6 +147,7 @@ export class RooftopArena {
     const muzzle = new THREE.Mesh(new THREE.SphereGeometry(.12, 6, 5), new THREE.MeshBasicMaterial({ color: '#ff8b32' })); muzzle.position.set(.03, -.38, -.86); muzzle.visible = false; arm.add(muzzle)
     group.userData.muzzle = muzzle
     group.userData.torso = torso
+    group.userData.head = head
     group.userData.arm = arm
     group.userData.legs = legs
     group.userData.baseY = 0
@@ -375,7 +376,12 @@ export class RooftopArena {
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
       this.enemyCoverTimer += dt
-      if (this.enemyCoverTimer > 5.2) { this.enemyCoverTimer = 0; this.enemyCovering = !this.enemyCovering }
+      const coverDecisionInterval = this.enemyHealth < 60 ? 3.8 : 5.2
+      if (this.enemyCoverTimer > coverDecisionInterval) {
+        this.enemyCoverTimer = 0
+        // A wounded opponent favors cover; otherwise it alternates between strafing and cover.
+        this.enemyCovering = this.enemyHealth < 60 ? Math.random() < .72 : !this.enemyCovering
+      }
       this.enemyHitTimer = Math.max(0, this.enemyHitTimer - dt)
       const enemyTorso = this.enemy.userData.torso as THREE.Mesh
       ;(enemyTorso.material as THREE.MeshStandardMaterial).color.set(this.enemyHitTimer > 0 ? '#ffb0a0' : '#d64f48')
@@ -387,10 +393,20 @@ export class RooftopArena {
       this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, enemyTargetX, 2.8, dt)
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 2.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
-      enemyLegs.forEach((leg, index) => { leg.rotation.x = Math.sin(this.enemyWalkTime * 4 + index * Math.PI) * .22 })
+      const enemyMoving = Math.abs(this.enemy.position.x - enemyTargetX) > .12 || Math.abs(this.enemy.position.z - enemyTargetZ) > .12
+      enemyLegs.forEach((leg, index) => {
+        const stride = enemyMoving ? Math.sin(this.enemyWalkTime * 7 + index * Math.PI) * .38 : Math.sin(this.enemyWalkTime * 1.8 + index * Math.PI) * .025
+        leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.enemyCovering ? -.72 + stride * .2 : stride, 9, dt)
+      })
       this.enemy.rotation.y = Math.PI
-      this.enemy.position.y = this.enemyCovering ? -.32 : Math.abs(Math.sin(this.enemyWalkTime * 2)) * .035
-      this.enemy.userData.arm.rotation.x = THREE.MathUtils.damp(this.enemy.userData.arm.rotation.x, 0, 8, dt)
+      this.enemy.position.y = this.enemyCovering ? -.32 : Math.abs(Math.sin(this.enemyWalkTime * 2.2)) * .045
+      const enemyTorsoGroup = this.enemy.userData.torso as THREE.Mesh
+      enemyTorsoGroup.rotation.z = THREE.MathUtils.damp(enemyTorsoGroup.rotation.z, Math.sin(this.enemyWalkTime * 1.7) * (enemyMoving ? .045 : .018), 7, dt)
+      const enemyHead = this.enemy.userData.head as THREE.Mesh
+      enemyHead.rotation.x = THREE.MathUtils.damp(enemyHead.rotation.x, Math.sin(this.enemyWalkTime * 1.35) * .035, 6, dt)
+      // Keep the weapon raised toward the player; lower it slightly while tucked behind cover.
+      const enemyArm = this.enemy.userData.arm as THREE.Group
+      enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, this.enemyCovering ? -.08 : -.24, 7, dt)
       this.enemyTimer += dt
       if (this.enemyTimer > 2.8 && this.enemyHealth > 0) {
         this.enemyTimer = 0
