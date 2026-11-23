@@ -36,6 +36,7 @@ export default function App() {
     transportRef.current?.close()
     gameRef.current?.stopOnline()
     onlineModeRef.current = false
+    pendingResumeLoadoutRef.current = null
     try { sessionStorage.removeItem(resumeStorageKey) } catch { /* storage may be unavailable */ }
     setRoomError('')
     setRoomCode(code)
