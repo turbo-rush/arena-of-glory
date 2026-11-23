@@ -49,12 +49,16 @@ export default function App() {
         setStarted(true)
         gameRef.current?.startOnline(
           input => transport.send({ type: 'input', input }),
-          (weapon, aimYaw, aimPitch) => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw, aimPitch })
+          (weapon, aimYaw, aimPitch) => transport.send({ type: 'fire', shotId: ++shotSequenceRef.current, weapon, aimYaw, aimPitch }),
+          () => transport.send({ type: 'reload' }),
+          weapon => transport.send({ type: 'switch_weapon', weapon })
         )
       } else if (message.type === 'input') {
         gameRef.current?.applyRemoteInput(message.input)
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
+      } else if (message.type === 'loadout_update') {
+        gameRef.current?.applyOnlineLoadout(message.weapon, message.ammo, message.reserveAmmo, message.reloading)
       } else if (message.type === 'shot_result') {
         if (!message.accepted) gameRef.current?.rejectOnlineShot()
         else gameRef.current?.applyOnlineShotResult(message.damage > 0, message.damage, message.targetHealth, message.hitZone)
