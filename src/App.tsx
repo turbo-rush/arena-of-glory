@@ -11,7 +11,7 @@ export default function App() {
   const [muted, setMuted] = useState(true)
   const [started, setStarted] = useState(false)
   const [displayName, setDisplayName] = useState('PLAYER')
-  const [roomCodeInput, setRoomCodeInput] = useState('')
+  const [inviteLink, setInviteLink] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [roomPhase, setRoomPhase] = useState<'idle' | 'connecting' | 'waiting' | 'ready' | 'fighting'>('idle')
   const [roomPlayers, setRoomPlayers] = useState<{ playerId: string; displayName: string; ready: boolean; connected: boolean }[]>([])
@@ -82,6 +82,9 @@ export default function App() {
       const room = await createDuelRoom()
       const url = new URL(room.websocketUrl)
       url.searchParams.set('name', displayName.trim().slice(0, 20) || 'PLAYER')
+      const invite = new URL(window.location.href)
+      invite.searchParams.set('room', room.roomCode)
+      setInviteLink(invite.toString())
       await connectToRoom(url.toString(), room.roomCode)
     } catch (error) {
       setRoomPhase('idle')
@@ -89,14 +92,23 @@ export default function App() {
     }
   }
 
-  const joinRoom = async () => {
+  const joinRoom = async (code: string) => {
     try {
-      const url = duelRoomWebSocketUrl(roomCodeInput, displayName)
-      await connectToRoom(url, roomCodeInput.trim().toUpperCase())
+      const normalizedCode = code.trim().toUpperCase()
+      const url = duelRoomWebSocketUrl(normalizedCode, displayName)
+      const invite = new URL(window.location.href)
+      invite.searchParams.set('room', normalizedCode)
+      setInviteLink(invite.toString())
+      await connectToRoom(url, normalizedCode)
     } catch (error) {
       setRoomError(error instanceof Error ? error.message : 'Could not join room')
     }
   }
+
+  useEffect(() => {
+    const inviteCode = new URLSearchParams(window.location.search).get('room')
+    if (inviteCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(inviteCode)) void joinRoom(inviteCode)
+  }, [])
 
   const setReady = () => {
     try {
@@ -110,17 +122,23 @@ export default function App() {
     transportRef.current?.close()
     transportRef.current = null
     setRoomCode('')
+    setInviteLink('')
     setRoomPlayers([])
     setMyPlayerId('')
     setRoomPhase('idle')
     setRoomError('')
   }
 
-  const copyRoomCode = async () => {
+  const shareInvite = async () => {
+    if (!inviteLink) return
     try {
-      await navigator.clipboard.writeText(roomCode)
-    } catch {
-      setRoomError('Clipboard unavailable. Share the room code manually.')
+      if (navigator.share) await navigator.share({ title: 'ARENA OF GLORY — Duel invitation', text: 'Join my rooftop duel!', url: inviteLink })
+      else {
+        await navigator.clipboard.writeText(inviteLink)
+        setRoomError('Invite link copied. Send it to your friend.')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') setRoomError('Could not share the invite link.')
     }
   }
 
@@ -175,18 +193,16 @@ export default function App() {
       {!started && <div className="start-overlay"><div className="lobby-card">
         <div className="eyebrow">REAL PLAYERS. ONE ROOFTOP.</div>
         <h1>PRIVATE<br/><em>DUEL.</em></h1>
-        <p>Create a private room and invite a friend, or join with their six-character code.</p>
+        <p>Create a private room and send your friend an invite link. Open a friend's link to join their duel.</p>
         <label className="lobby-label">PLAYER NAME</label>
         <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />
         {roomPhase === 'idle' && <>
           <button className="lobby-primary" onClick={createRoom}>CREATE DUEL ROOM <span>→</span></button>
-          <div className="lobby-divider"><span>OR JOIN A FRIEND</span></div>
-          <div className="lobby-join"><input className="lobby-input code-input" value={roomCodeInput} maxLength={6} onChange={event => setRoomCodeInput(event.target.value.toUpperCase())} placeholder="6-CHARACTER CODE" /><button onClick={joinRoom} disabled={roomCodeInput.trim().length !== 6}>JOIN</button></div>
         </>}
         {roomPhase !== 'idle' && <div className="room-status">
           <div className="room-status-line"><span className={roomPhase === 'connecting' ? 'status-dot connecting' : 'status-dot'} />{roomPhase === 'connecting' ? 'CONNECTING TO DUEL SERVER' : roomPhase === 'fighting' ? 'BOTH PLAYERS READY' : 'ROOM CONNECTED'}</div>
-          <div className="room-code-label">ROOM CODE</div>
-          <div className="room-code"><strong>{roomCode}</strong><button onClick={copyRoomCode}>COPY</button></div>
+          <div className="room-code-label">PRIVATE INVITATION</div>
+          <button className="lobby-primary invite-button" onClick={shareInvite}>SHARE INVITE LINK <span>↗</span></button>
           <div className="room-player-list">{[0, 1].map(index => {
             const player = roomPlayers[index]
             return <div className="room-player" key={index}><span className="player-slot">{index + 1}</span><div><b>{player?.displayName ?? (index === 0 ? 'WAITING FOR YOU' : 'WAITING FOR OPPONENT')}</b><small>{player ? (player.ready ? 'READY' : 'CONNECTED') : 'NOT CONNECTED'}</small></div><i className={player?.ready ? 'player-ready' : ''}>{player?.ready ? '✓' : '—'}</i></div>
