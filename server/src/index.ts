@@ -135,7 +135,7 @@ export class DuelRoom {
     return json({ error: "not_found" }, 404)
   }
 
-  webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): void {
+  async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     this.restorePlayers()
     if (typeof raw !== "string" || raw.length > 16_384) {
       socket.close(1009, "message_too_large")
@@ -252,10 +252,11 @@ export class DuelRoom {
             const baseDamage: Record<WeaponId, number> = { pistol: 18, rifle: 12, shotgun: 28, sniper: 48 }
             damage = hitZone === "head" ? Math.round(baseDamage[typedWeapon] * (typedWeapon === "sniper" ? 2.5 : typedWeapon === "pistol" ? 2.2 : typedWeapon === "rifle" ? 1.8 : 1.25)) : baseDamage[typedWeapon]
             target.health = Math.max(0, target.health - damage)
-            const targetAttachment = target.socket.deserializeAttachment() as Record<string, unknown> | null
+            const targetAttachment = target.socket?.deserializeAttachment() as Record<string, unknown> | null
             if (target.socket) target.socket.serializeAttachment({ ...(targetAttachment ?? {}), health: target.health })
+            else await this.persistDisconnectedPlayer(target)
             target.socket?.send(JSON.stringify({ type: "health_update", health: target.health, damage, hitZone, shooterId: player.id }))
-            if (target.health === 0) this.finishRound(player)
+            if (target.health === 0) await this.finishRound(player)
           }
         }
         socket.send(JSON.stringify({ type: "shot_result", shotId: Number(shotId), shooterId: player.id, hitPlayerId: damage > 0 && target ? target.id : null, hitZone, damage, targetHealth: damage > 0 && target ? target.health : null, accepted: true }))
@@ -316,6 +317,7 @@ export class DuelRoom {
   }
 
   async alarm(): Promise<void> {
+    await this.restorePendingPlayers()
     const now = Date.now()
     for (const [id, player] of this.players) {
       if (!player.socket) {
@@ -363,8 +365,8 @@ export class DuelRoom {
     this.broadcastRoomState()
   }
 
-  webSocketError(socket: WebSocket): void {
-    this.webSocketClose(socket)
+  async webSocketError(socket: WebSocket): Promise<void> {
+    await this.webSocketClose(socket, 1006, "socket_error")
   }
 
   private restorePlayers(): void {
@@ -397,7 +399,7 @@ export class DuelRoom {
   }
 
 
-  private finishRound(winner: Player): void {
+  private async finishRound(winner: Player): Promise<void> {
     if (this.phase !== "fighting") return
     winner.roundWins += 1
     for (const player of this.players.values()) {
@@ -430,6 +432,7 @@ export class DuelRoom {
       player.reloadUntil = 0
       const attachment = player.socket?.deserializeAttachment() as Record<string, unknown> | null
       if (player.socket) player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {}, weapon: player.weapon, ammo: player.ammo, reserve: player.reserve, reloadUntil: 0 })
+      else await this.persistDisconnectedPlayer(player)
     }
     this.broadcastRoomState()
   }
@@ -440,12 +443,21 @@ export class DuelRoom {
     else this.phase = [...this.players.values()].every(player => player.ready) ? "fighting" : "ready"
   }
 
+  private async persistDisconnectedPlayer(player: Player): Promise<void> {
+    const key = "resume:" + player.resumeToken
+    const saved = await this.state.storage.get<{ expiresAt: number }>(key)
+    if (!saved) return
+    const { socket: _socket, ...data } = player
+    await this.state.storage.put(key, { expiresAt: saved.expiresAt, player: { ...data, playerId: player.id } })
+  }
+
   private broadcastRoomState(): void {
+    void this.state.storage.put("roomPhase", this.phase)
     this.broadcast({
       type: "room_state",
       phase: this.phase,
       players: [...this.players.values()].map(player => ({
-        playerId: player.id, displayName: player.name, ready: player.ready, connected: true,
+        playerId: player.id, displayName: player.name, ready: player.ready, connected: player.socket !== null,
       })),
     })
   }
