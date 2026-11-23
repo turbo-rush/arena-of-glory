@@ -1,0 +1,185 @@
+export const DUEL_PROTOCOL_VERSION = 1 as const
+
+export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
+export type DuelPhase = 'waiting' | 'ready' | 'fighting' | 'finished'
+export type HitZone = 'head' | 'body'
+
+export type DuelInput = {
+  seq: number
+  clientTime: number
+  moveX: number
+  moveZ: number
+  lookYaw: number
+  lookPitch: number
+  crouched: boolean
+  aiming: boolean
+}
+
+export type ClientDuelMessage =
+  | { type: 'create_room'; protocol: typeof DUEL_PROTOCOL_VERSION; displayName: string }
+  | { type: 'join_room'; protocol: typeof DUEL_PROTOCOL_VERSION; roomCode: string; displayName: string }
+  | { type: 'set_ready'; ready: boolean }
+  | { type: 'input'; input: DuelInput }
+  | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
+  | { type: 'reload' }
+  | { type: 'switch_weapon'; weapon: WeaponId }
+  | { type: 'leave_room' }
+  | { type: 'ping'; clientTime: number }
+
+export type ServerDuelMessage =
+  | { type: 'welcome'; playerId: string; roomCode: string; slot: 1 | 2 }
+  | { type: 'room_state'; phase: DuelPhase; players: { playerId: string; displayName: string; ready: boolean; connected: boolean }[] }
+  | { type: 'match_started'; arenaId: string; seed: number; serverTime: number }
+  | { type: 'snapshot'; serverTick: number; ackInputSeq: number; players: { playerId: string; x: number; y: number; z: number; yaw: number; health: number; ammo: number; weapon: WeaponId; alive: boolean }[] }
+  | { type: 'shot_result'; shotId: number; shooterId: string; hitPlayerId: string | null; hitZone: HitZone | null; damage: number; targetHealth: number | null; accepted: boolean }
+  | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
+  | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
+  | { type: 'pong'; clientTime: number; serverTime: number }
+  | { type: 'error'; code: string; message: string }
+
+export type DuelConnectionState = 'disconnected' | 'connecting' | 'connected'
+
+type Listener<T> = (value: T) => void
+
+const WEAPONS: WeaponId[] = ['pistol', 'rifle', 'shotgun', 'sniper']
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+const isNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isWeapon = (value: unknown): value is WeaponId =>
+  isString(value) && WEAPONS.includes(value as WeaponId)
+
+/** Reject malformed or unknown server packets before they reach game code. */
+export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!isRecord(value) || !isString(value.type)) return null
+
+  switch (value.type) {
+    case 'welcome':
+      return isString(value.playerId) && isString(value.roomCode) && (value.slot === 1 || value.slot === 2)
+        ? value as ServerDuelMessage : null
+    case 'room_state':
+      return ['waiting', 'ready', 'fighting', 'finished'].includes(String(value.phase)) && Array.isArray(value.players)
+        ? value as ServerDuelMessage : null
+    case 'match_started':
+      return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime)
+        ? value as ServerDuelMessage : null
+    case 'snapshot':
+      return isNumber(value.serverTick) && isNumber(value.ackInputSeq) && Array.isArray(value.players)
+        ? value as ServerDuelMessage : null
+    case 'shot_result':
+      return isNumber(value.shotId) && isString(value.shooterId) &&
+        (value.hitPlayerId === null || isString(value.hitPlayerId)) &&
+        (value.hitZone === null || value.hitZone === 'head' || value.hitZone === 'body') &&
+        isNumber(value.damage) && (value.targetHealth === null || isNumber(value.targetHealth)) &&
+        typeof value.accepted === 'boolean' ? value as ServerDuelMessage : null
+    case 'round_ended':
+    case 'match_ended':
+      return (value.winnerPlayerId === null || isString(value.winnerPlayerId)) &&
+        isRecord(value.score) && isNumber(value.score.player1) && isNumber(value.score.player2)
+        ? value as ServerDuelMessage : null
+    case 'pong':
+      return isNumber(value.clientTime) && isNumber(value.serverTime) ? value as ServerDuelMessage : null
+    case 'error':
+      return isString(value.code) && isString(value.message) ? value as ServerDuelMessage : null
+    default:
+      return null
+  }
+}
+
+/**
+ * Browser-side transport only. The authoritative room/game server is a separate
+ * Cloudflare Durable Object service; this class never simulates an online rival.
+ */
+export class DuelWebSocketTransport {
+  private socket: WebSocket | null = null
+  private state: DuelConnectionState = 'disconnected'
+  private messageListeners = new Set<Listener<ServerDuelMessage>>()
+  private stateListeners = new Set<Listener<DuelConnectionState>>()
+
+  constructor(private readonly url: string) {
+    if (!url.trim()) throw new Error('Duel server URL is required')
+  }
+
+  get connectionState(): DuelConnectionState {
+    return this.state
+  }
+
+  onMessage(listener: Listener<ServerDuelMessage>): () => void {
+    this.messageListeners.add(listener)
+    return () => this.messageListeners.delete(listener)
+  }
+
+  onStateChange(listener: Listener<DuelConnectionState>): () => void {
+    this.stateListeners.add(listener)
+    listener(this.state)
+    return () => this.stateListeners.delete(listener)
+  }
+
+  connect(): Promise<void> {
+    if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve()
+    if (this.state === 'connecting') return Promise.reject(new Error('Duel connection is already opening'))
+
+    this.setState('connecting')
+    return new Promise((resolve, reject) => {
+      const socket = new WebSocket(this.url)
+      this.socket = socket
+      let settled = false
+
+      socket.addEventListener('open', () => {
+        settled = true
+        this.setState('connected')
+        resolve()
+      }, { once: true })
+
+      socket.addEventListener('message', event => {
+        if (typeof event.data !== 'string') return
+        const message = parseServerDuelMessage(event.data)
+        if (message) this.messageListeners.forEach(listener => listener(message))
+      })
+
+      socket.addEventListener('error', () => {
+        if (!settled) {
+          settled = true
+          this.setState('disconnected')
+          reject(new Error('Unable to connect to the duel server'))
+        }
+      })
+
+      socket.addEventListener('close', () => {
+        if (this.socket === socket) this.socket = null
+        this.setState('disconnected')
+        if (!settled) {
+          settled = true
+          reject(new Error('Duel server closed the connection'))
+        }
+      })
+    })
+  }
+
+  send(message: ClientDuelMessage): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      throw new Error('Cannot send duel data while disconnected')
+    }
+    this.socket.send(JSON.stringify(message))
+  }
+
+  close(): void {
+    const socket = this.socket
+    this.socket = null
+    if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'client_leave')
+    this.setState('disconnected')
+  }
+
+  private setState(next: DuelConnectionState): void {
+    if (this.state === next) return
+    this.state = next
+    this.stateListeners.forEach(listener => listener(next))
+  }
+}
