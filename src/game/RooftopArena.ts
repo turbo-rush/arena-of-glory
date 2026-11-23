@@ -363,20 +363,68 @@ export class RooftopArena {
   private buildWeaponModel(model: THREE.Group, weapon: WeaponId) {
     model.clear()
     const dark = this.material('#20242b', .38)
-    const metal = this.material('#59616c', .34)
-    const addPart = (w: number, h: number, d: number, x: number, y: number, z: number, material = dark) => {
-      const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
-      part.position.set(x, y, z); part.castShadow = true; model.add(part)
+    const metal = this.material('#697583', .3)
+    const accent = this.material('#ff8b45', .42)
+    const glow = new THREE.MeshBasicMaterial({ color: '#ffc36a' })
+    const grip = this.material('#111820', .92)
+    const addPart = (w: number, h: number, d: number, x: number, y: number, z: number, material = dark, bevel = false) => {
+      const geometry = bevel
+        ? new THREE.BoxGeometry(w, h, d, 1, 1, 1)
+        : new THREE.BoxGeometry(w, h, d)
+      const part = new THREE.Mesh(geometry, material)
+      part.position.set(x, y, z); part.castShadow = true; part.receiveShadow = true; model.add(part)
+      return part
+    }
+    const addBarrel = (length: number, radius: number, z: number) => {
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 8), metal)
+      barrel.rotation.x = Math.PI / 2; barrel.position.set(0, .035, z); barrel.castShadow = true; model.add(barrel)
+      addPart(radius * 2.8, radius * 2.8, .055, 0, .035, z - length * .43, accent)
+    }
+    const addSight = (z: number, size = 1) => {
+      addPart(.19 * size, .045, .2 * size, 0, .145, z, metal)
+      addPart(.075 * size, .11 * size, .075 * size, 0, .21 * size, z, dark)
+      addPart(.035 * size, .025 * size, .035 * size, 0, .27 * size, z, glow)
     }
     if (weapon === 'pistol') {
-      addPart(.16, .17, .48, 0, 0, -.08); addPart(.13, .25, .15, 0, -.17, .02); addPart(.08, .08, .12, 0, .08, -.34, metal)
+      addPart(.17, .18, .5, 0, 0, -.08)
+      addPart(.135, .27, .17, 0, -.17, .025, grip)
+      addPart(.09, .07, .13, 0, .085, -.34, metal)
+      addPart(.035, .035, .19, 0, .105, -.12, accent)
+      addBarrel(.12, .045, -.38)
+      addPart(.13, .035, .14, 0, -.3, .02, accent)
+      addSight(-.28, .72)
     } else if (weapon === 'rifle') {
-      addPart(.17, .2, .82, 0, 0, -.2); addPart(.12, .12, .62, 0, .03, -.69, metal); addPart(.15, .3, .22, 0, -.2, -.08); addPart(.18, .16, .3, 0, -.02, .31)
+      addPart(.18, .2, .84, 0, 0, -.2)
+      addBarrel(.72, .055, -.69)
+      addPart(.15, .31, .23, 0, -.2, -.08, grip)
+      addPart(.18, .16, .31, 0, -.02, .31, dark)
+      addPart(.12, .28, .22, 0, -.23, -.18, metal)
+      addPart(.14, .06, .36, 0, -.13, -.56, grip)
+      addPart(.19, .045, .56, 0, .125, -.24, metal)
+      addSight(-.38, 1.05)
+      addPart(.035, .13, .24, .105, .01, -.2, accent)
     } else if (weapon === 'shotgun') {
-      addPart(.2, .22, .72, 0, 0, -.18); addPart(.09, .09, .72, 0, .04, -.68, metal); addPart(.16, .13, .3, 0, -.1, .28); addPart(.17, .1, .26, 0, -.12, -.38)
+      addPart(.21, .22, .76, 0, 0, -.18)
+      addBarrel(.68, .065, -.69)
+      addPart(.17, .14, .31, 0, -.1, .28, grip)
+      addPart(.18, .11, .28, 0, -.12, -.38, grip)
+      addPart(.11, .12, .64, 0, -.13, -.58, metal)
+      addPart(.22, .045, .24, 0, .13, -.2, accent)
+      addSight(-.48, .82)
     } else {
-      addPart(.19, .2, .78, 0, 0, -.22); addPart(.075, .075, 1.0, 0, .07, -.86, metal); addPart(.2, .24, .28, 0, .19, -.32); addPart(.18, .14, .38, 0, -.04, .35)
+      addPart(.19, .2, .82, 0, 0, -.22)
+      addBarrel(1.0, .042, -.86)
+      addPart(.2, .24, .3, 0, .19, -.32, metal)
+      addPart(.18, .14, .4, 0, -.04, .35, grip)
+      addPart(.12, .24, .22, 0, -.18, -.12, dark)
+      addPart(.24, .06, .3, 0, .15, -.33, accent)
+      addPart(.22, .045, .18, 0, .33, -.32, metal)
+      addSight(-.47, 1.35)
+      addPart(.12, .08, .14, 0, -.13, -.7, accent)
     }
+    // Small side rail and serial plate make each weapon read as manufactured gear.
+    addPart(.035, .055, .34, .105, .015, -.18, metal)
+    addPart(.025, .08, .12, .125, .02, .02, accent)
   }
   private rebuildWeaponModel() { this.buildWeaponModel(this.player.userData.weaponModel as THREE.Group, this.weapon) }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
