@@ -193,10 +193,14 @@ export class DuelRoom {
           typeof state.crouched === "boolean" && typeof state.aiming === "boolean"
         if (!valid) break
         const inputNow = Date.now()
-        const elapsed = Math.min(0.5, Math.max(0.05, (inputNow - player.lastInputAt) / 1000))
+        const elapsedMs = inputNow - player.lastInputAt
+        // The client sends movement snapshots at 20 Hz. Reject faster bursts
+        // instead of granting each packet the old minimum movement allowance.
+        if (elapsedMs < 35) break
+        const elapsed = Math.min(0.25, Math.max(0, elapsedMs / 1000))
         const deltaX = Number(state.moveX) - player.x
         const deltaZ = Number(state.moveZ) - player.z
-        const maxTravel = 7 * elapsed + 0.35
+        const maxTravel = 7 * elapsed + 0.3
         if (Math.hypot(deltaX, deltaZ) > maxTravel) break
         player.lastInputAt = inputNow
         player.lastInputSeq = Number(state.seq)
