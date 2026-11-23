@@ -55,6 +55,7 @@ export class RooftopArena {
   ]
   private muzzleTimer = 0
   private tracer: THREE.Line | null = null
+  private impactParticles: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; maxLife: number }[] = []
   private listener: StateListener
   private host: HTMLElement
   private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload(); if (e.code === 'KeyC' && !e.repeat) this.crouch() }
@@ -229,8 +230,12 @@ export class RooftopArena {
         totalDamage += config.damage * (isHead ? config.headMultiplier : 1)
       }
     }
-    if (totalDamage > 0) { this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = .3 }
-    this.recoil = 1
+    if (totalDamage > 0) {
+      this.enemyHealth = Math.max(0, this.enemyHealth - Math.round(totalDamage)); this.enemyHitTimer = .3
+      const impact = new THREE.Vector3(); this.enemy.localToWorld(impact.set((Math.random() - .5) * .38, 1.15 + Math.random() * .65, 0))
+      this.spawnImpact(impact, this.weapon === 'sniper' ? '#fff0b0' : '#ff9b54', this.weapon === 'shotgun' ? 12 : 7)
+    }
+    this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
     this.flash(this.player)
     this.showTracer(totalDamage > 0)
     this.publish()
@@ -239,9 +244,18 @@ export class RooftopArena {
   private flash(fighter: THREE.Group) {
     const muzzle = fighter.userData.muzzle as THREE.Mesh
     muzzle.visible = true
+    muzzle.scale.setScalar(this.weapon === 'shotgun' ? 1.65 : this.weapon === 'sniper' ? 1.35 : 1)
     const arm = fighter.userData.arm as THREE.Group | undefined
     if (arm) arm.rotation.x = -.18
-    window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, 85)
+    window.setTimeout(() => { if (!this.disposed) muzzle.visible = false }, this.weapon === 'sniper' ? 125 : 75)
+  }
+
+  private spawnImpact(position: THREE.Vector3, color: string, count: number) {
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(.045 + Math.random() * .035, 5, 4), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }))
+      mesh.position.copy(position); this.scene.add(mesh)
+      this.impactParticles.push({ mesh, velocity: new THREE.Vector3((Math.random() - .5) * 3.2, Math.random() * 2.6, (Math.random() - .5) * 2.2), life: .32 + Math.random() * .2, maxLife: .52 })
+    }
   }
 
   private showTracer(hit: boolean) {
@@ -291,6 +305,19 @@ export class RooftopArena {
     if (this.disposed) return
     this.frame = requestAnimationFrame(this.animate)
     const dt = Math.min(this.clock.getDelta(), .04)
+    if (this.impactParticles.length) {
+      for (let i = this.impactParticles.length - 1; i >= 0; i--) {
+        const particle = this.impactParticles[i]
+        particle.life -= dt
+        particle.velocity.y -= 5.5 * dt
+        particle.mesh.position.addScaledVector(particle.velocity, dt)
+        ;(particle.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, particle.life / particle.maxLife)
+        if (particle.life <= 0) {
+          this.scene.remove(particle.mesh); particle.mesh.geometry.dispose(); (particle.mesh.material as THREE.Material).dispose()
+          this.impactParticles.splice(i, 1)
+        }
+      }
+    }
     if (this.started) {
       if (this.reloading) {
         this.reloadTimer -= dt
@@ -330,7 +357,8 @@ export class RooftopArena {
       this.player.rotation.z = THREE.MathUtils.damp(this.player.rotation.z, this.peekDirection * -.2, 9, dt)
       this.player.rotation.x = THREE.MathUtils.damp(this.player.rotation.x, this.crouched ? .12 : 0, 9, dt)
       const playerArm = this.player.userData.arm as THREE.Group
-      playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * .2
+      const recoilKick = this.weapon === 'sniper' ? .48 : this.weapon === 'shotgun' ? .38 : this.weapon === 'rifle' ? .24 : .3
+      playerArm.rotation.x = THREE.MathUtils.damp(playerArm.rotation.x, this.reloading ? 1.05 : this.aiming ? -.12 : 0, 10, dt) - this.recoil * recoilKick
       this.recoil = Math.max(0, this.recoil - dt * 5)
       this.enemyWalkTime += dt
       this.enemyCoverTimer += dt
@@ -376,6 +404,7 @@ export class RooftopArena {
     this.disposed = true; cancelAnimationFrame(this.frame); this.resizeObserver.disconnect()
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp)
     if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose() }
+    this.impactParticles.forEach(p => { this.scene.remove(p.mesh); p.mesh.geometry.dispose(); (p.mesh.material as THREE.Material).dispose() }); this.impactParticles = []
     this.renderer.dispose(); this.host.removeChild(this.renderer.domElement)
   }
 }
