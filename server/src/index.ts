@@ -137,6 +137,7 @@ export class DuelRoom {
 
   async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     this.restorePlayers()
+    await this.restorePendingPlayers()
     if (typeof raw !== "string" || raw.length > 16_384) {
       socket.close(1009, "message_too_large")
       return
@@ -300,6 +301,7 @@ export class DuelRoom {
 
   async webSocketClose(socket: WebSocket, code: number, reason: string): Promise<void> {
     this.restorePlayers()
+    await this.restorePendingPlayers()
     const attachment = socket.deserializeAttachment() as Record<string, any> | null
     const player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
     if (!player || player.socket !== socket) return
@@ -351,6 +353,9 @@ export class DuelRoom {
         reserve: data.reserve ?? { ...RESERVES },
         shotTimes: data.shotTimes ?? {},
       } as Player)
+    }
+    if (pending.size > 0) {
+      this.phase = await this.state.storage.get<typeof this.phase>("roomPhase") ?? this.phase
     }
   }
 
