@@ -31,6 +31,8 @@ export class RooftopArena {
   private onLocalReload?: () => void
   private onLocalSwitchWeapon?: (weapon: WeaponId) => void
   private remoteCrouched = false
+  private remoteAiming = false
+  private remoteLookPitch = 0
   private remoteWeapon: WeaponId = 'pistol'
   private remoteReloadTimer = 0
   private remoteFireTimer = 0
@@ -275,6 +277,8 @@ export class RooftopArena {
     this.remoteTarget.x = THREE.MathUtils.clamp(input.moveX, -6.8, 6.8)
     this.remoteTarget.z = THREE.MathUtils.clamp(input.moveZ, -1.8, 6.5)
     this.remoteCrouched = input.crouched
+    this.remoteAiming = input.aiming
+    this.remoteLookPitch = THREE.MathUtils.clamp(input.lookPitch, -Math.PI / 2, Math.PI / 2)
     this.remoteTarget.y = input.crouched ? -.32 : 0
     this.remoteTargetYaw = Number.isFinite(input.lookYaw) ? input.lookYaw : Math.PI
     const legs = this.enemy.userData.legs as THREE.Mesh[]
@@ -791,17 +795,19 @@ export class RooftopArena {
         this.enemy.position.x = THREE.MathUtils.damp(this.enemy.position.x, this.remoteTarget.x, 13, dt)
         this.enemy.position.y = THREE.MathUtils.damp(this.enemy.position.y, this.remoteTarget.y, 13, dt)
         this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, this.remoteTarget.z, 13, dt)
-        this.enemy.rotation.y = THREE.MathUtils.damp(this.enemy.rotation.y, this.remoteTargetYaw, 13, dt)
+        const yawDelta = Math.atan2(Math.sin(this.remoteTargetYaw - this.enemy.rotation.y), Math.cos(this.remoteTargetYaw - this.enemy.rotation.y))
+        this.enemy.rotation.y += THREE.MathUtils.damp(0, yawDelta, 13, dt)
         this.networkTimer += dt
         if (this.networkTimer >= 0.05) {
           this.networkTimer = 0
+          const aimDirection = this.camera.getWorldDirection(new THREE.Vector3()).normalize()
           this.onLocalInput?.({
             seq: ++this.inputSequence,
             clientTime: Date.now(),
             moveX: this.player.position.x,
             moveZ: this.player.position.z,
-            lookYaw: this.player.rotation.y,
-            lookPitch: 0,
+            lookYaw: Math.atan2(aimDirection.x, aimDirection.z),
+            lookPitch: Math.asin(THREE.MathUtils.clamp(aimDirection.y, -1, 1)),
             crouched: this.crouched,
             aiming: this.aiming
           })
@@ -815,8 +821,10 @@ export class RooftopArena {
         this.remoteReloadTimer = Math.max(0, this.remoteReloadTimer - dt)
         this.remoteFireTimer = Math.max(0, this.remoteFireTimer - dt)
         const remoteArm = this.enemy.userData.arm as THREE.Group
-        const remoteTargetArm = this.remoteReloadTimer > 0 ? 1.05 : this.remoteFireTimer > 0 ? -.62 : this.remoteCrouched ? -.08 : -.28
+        const remoteTargetArm = this.remoteReloadTimer > 0 ? 1.05 : this.remoteFireTimer > 0 ? -.62 : this.remoteAiming ? -.32 - this.remoteLookPitch * .42 : this.remoteCrouched ? -.08 : -.28
         remoteArm.rotation.x = THREE.MathUtils.damp(remoteArm.rotation.x, remoteTargetArm, this.remoteReloadTimer > 0 ? 7 : 12, dt)
+        const remoteTorso = this.enemy.userData.torso as THREE.Mesh
+        remoteTorso.rotation.x = THREE.MathUtils.damp(remoteTorso.rotation.x, this.remoteAiming ? -this.remoteLookPitch * .12 : 0, 8, dt)
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
