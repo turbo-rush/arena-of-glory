@@ -281,13 +281,20 @@ export class RooftopArena {
     }
 
     // Shared athletic base silhouette; hit zones stay on the torso and head.
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, .42), cloth)
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(isVolt ? .76 : .64, 1.05, .42), cloth)
     torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
+    group.userData.character = character
+    // Layered street-fighter tailoring: cropped panels, reinforced shoulders and utility details.
+    addBox(group, isVolt ? .88 : .74, .2, .5, 0, 1.67, 0, cloth)
+    addBox(group, isVolt ? .2 : .16, .28, .49, isVolt ? -.34 : -.29, 1.55, .015, secondary, isVolt ? -.08 : .12)
+    addBox(group, isVolt ? .2 : .16, .28, .49, isVolt ? .34 : .29, 1.55, .015, accent, isVolt ? .08 : -.12)
+    addBox(group, .78, .12, .47, 0, .83, 0, rubber)
+    addBox(group, .18, .16, .035, isVolt ? -.29 : .25, .85, .245, metal)
+    addBox(group, .12, .22, .035, isVolt ? .29 : -.25, .85, .245, accent)
     const shirt = this.material(isVolt ? '#e8e2d5' : '#d8d0e2', .95)
     addBox(group, .3, .62, .035, 0, 1.22, .232, shirt)
     addBox(group, .12, .62, .045, -.22, 1.2, .244, accent, -.08)
     addBox(group, .12, .62, .045, .22, 1.2, .244, accent, .08)
-    addBox(group, .76, .16, .48, 0, 1.68, 0, cloth)
     addBox(group, .16, .72, .045, -.31, 1.22, .235, secondary, -.12)
     addBox(group, .16, .72, .045, .31, 1.22, .235, secondary, .12)
     addBox(group, .58, .11, .46, 0, .76, 0, rubber)
@@ -307,9 +314,13 @@ export class RooftopArena {
       addCone(group, -.02, 2.27, .08, .13, .36, hair, 0, -.18)
       addCone(group, .13, 2.23, .015, .12, .32, hair, 0, .55)
       addSphere(group, -.25, 1.98, -.015, .09, .2, .12, hair)
-      // Signature lightning mark on the back panel.
+      // Signature lightning mark and asymmetric utility details.
       addBox(group, .08, .24, .025, .02, 1.24, -.228, accent, .28)
       addBox(group, .16, .07, .026, .04, 1.15, -.23, accent, -.35)
+      addBox(group, .22, .25, .08, -.42, 1.03, .02, pants, -.12)
+      addBox(group, .22, .25, .08, .42, 1.03, .02, pants, .12)
+      addBox(group, .12, .09, .035, -.42, 1.03, .07, secondary)
+      addBox(group, .12, .09, .035, .42, 1.03, .07, accent)
     } else {
       const hair = this.material('#f044a0', .68)
       const darkHair = this.material('#33203f', .78)
@@ -323,18 +334,23 @@ export class RooftopArena {
       addCone(pony, .12, .68, -.39, .095, .26, hair, -.35, .2)
       addBox(group, .1, .08, .08, 0, 2.13, -.23, secondary)
       addBox(group, .055, .2, .03, 0, 1.98, -.23, darkHair, .12)
-      // Magenta back emblem and asymmetric cropped-jacket hem.
+      // Cropped jacket, asymmetric belt rig and bold VEX back insignia.
       addBox(group, .24, .08, .025, 0, .88, -.23, accent, -.08)
       addBox(group, .08, .24, .025, .02, 1.03, -.23, secondary, .25)
+      addBox(group, .22, .22, .08, -.36, 1.02, .02, secondary, -.16)
+      addBox(group, .22, .22, .08, .36, 1.02, .02, pants, .16)
+      addBox(group, .1, .1, .04, -.36, 1.02, .07, accent)
+      addBox(group, .1, .1, .04, .36, 1.02, .07, secondary)
     }
 
     const legs: THREE.Mesh[] = []
-    for (const x of [-.2, .2]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(.25, .7, .3), pants)
+    for (const x of (isVolt ? [-.23, .23] : [-.18, .18])) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(isVolt ? .27 : .23, .7, .3), pants)
       leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
-      addBox(leg, .34, .18, .43, 0, -.34, -.075, rubber)
-      addBox(leg, .35, .055, .44, 0, -.27, -.075, accent)
+      addBox(leg, isVolt ? .38 : .34, .2, .46, 0, -.34, -.075, rubber)
+      addBox(leg, isVolt ? .39 : .35, .06, .47, 0, -.27, -.075, accent)
       addBox(leg, .27, .12, .08, 0, .02, .17, secondary)
+      addBox(leg, .29, .2, .08, 0, .12, .17, isVolt ? metal : secondary)
     }
     // Distinctive gloves and forearm guards.
     const leftArm = new THREE.Group(); leftArm.position.set(-.43, 1.42, -.08); group.add(leftArm)
@@ -356,6 +372,9 @@ export class RooftopArena {
     group.userData.head = head
     group.userData.arm = arm
     group.userData.legs = legs
+    // Character-specific forearm guards and a visible shoulder badge.
+    addBox(leftArm, .25, .18, .25, 0, -.12, .015, secondary)
+    addBox(group, .18, .18, .035, isVolt ? -.39 : .39, 1.61, .245, accent, isVolt ? -.12 : .12)
     group.userData.baseY = 0
     return group
   }
@@ -427,6 +446,20 @@ export class RooftopArena {
     addPart(.025, .08, .12, .125, .02, .02, accent)
   }
   private rebuildWeaponModel() { this.buildWeaponModel(this.player.userData.weaponModel as THREE.Group, this.weapon) }
+  setPlayerHero(hero: 'VOLT' | 'VEX') {
+    const character = hero === 'VOLT' ? 'volt' : 'vex'
+    if (this.player.userData.character === character) return
+    const parent = this.player.parent
+    if (!parent) return
+    const replacement = this.createFighter(character)
+    replacement.position.copy(this.player.position)
+    replacement.rotation.copy(this.player.rotation)
+    replacement.scale.copy(this.player.scale)
+    parent.add(replacement)
+    parent.remove(this.player)
+    this.player = replacement
+    this.rebuildWeaponModel()
+  }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
   startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void, onLocalReload: () => void, onLocalSwitchWeapon: (weapon: WeaponId) => void) {
     this.onlineMode = true
