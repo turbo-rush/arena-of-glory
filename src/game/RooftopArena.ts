@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { DuelInput } from '../net/duelTransport'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
@@ -20,6 +21,7 @@ const ARENAS = [
 
 export class RooftopArena {
   private scene = new THREE.Scene()
+  private characterLoader = new GLTFLoader()
   private camera = new THREE.PerspectiveCamera(52, 1, 0.1, 300)
   private renderer: THREE.WebGLRenderer
   private player!: THREE.Group
@@ -450,8 +452,127 @@ export class RooftopArena {
     // Character-specific forearm guards and a visible shoulder badge.
     addBox(leftArm, .25, .18, .25, 0, -.12, .015, secondary)
     addBox(group, .18, .18, .035, isVolt ? -.39 : .39, 1.61, .245, accent, isVolt ? -.12 : .12)
+    // Dedicated hit volumes remain independent from the rendered character asset.
+    delete torso.userData.hitZone
+    delete head.userData.hitZone
+    const bodyHitbox = new THREE.Mesh(
+      new THREE.CapsuleGeometry(.34, .42, 4, 8),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false })
+    )
+    bodyHitbox.position.set(0, 1.2, 0)
+    bodyHitbox.userData.hitZone = 'body'
+    group.add(bodyHitbox)
+    const headHitbox = new THREE.Mesh(
+      new THREE.SphereGeometry(.29, 12, 10),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false })
+    )
+    headHitbox.position.set(0, 1.94, 0)
+    headHitbox.userData.hitZone = 'head'
+    group.add(headHitbox)
     group.userData.baseY = 0
+    this.loadCharacterModel(group, character)
     return group
+  }
+
+  private loadCharacterModel(fighter: THREE.Group, character: 'volt' | 'vex') {
+    this.characterLoader.load(`/models/${character}.glb`, (gltf) => {
+      if (this.disposed || !fighter.parent) {
+        gltf.scene.traverse(object => {
+          const mesh = object as THREE.Mesh
+          if (mesh.geometry) mesh.geometry.dispose()
+          if (Array.isArray(mesh.material)) mesh.material.forEach(material => material.dispose())
+          else if (mesh.material) mesh.material.dispose()
+        })
+        return
+      }
+
+      const weapon = fighter.userData.weaponModel as THREE.Group | undefined
+      const muzzle = fighter.userData.muzzle as THREE.Mesh | undefined
+      if (weapon) weapon.parent?.remove(weapon)
+      if (muzzle) muzzle.parent?.remove(muzzle)
+
+      // Keep the gameplay rig as a compatibility layer, but render the generated skinned model.
+      fighter.traverse(object => {
+        if (object instanceof THREE.Mesh && !object.userData.hitZone && (!weapon || !weapon.getObjectById(object.id)) && object !== muzzle) {
+          object.visible = false
+        }
+      })
+
+      const visual = gltf.scene
+      const originalBounds = new THREE.Box3().setFromObject(visual)
+      const originalSize = originalBounds.getSize(new THREE.Vector3())
+      const modelScale = 2.3 / Math.max(originalSize.y, .001)
+      visual.scale.setScalar(modelScale)
+      visual.updateMatrixWorld(true)
+      const fittedBounds = new THREE.Box3().setFromObject(visual)
+      visual.position.set(
+        -(fittedBounds.min.x + fittedBounds.max.x) * .5,
+        -fittedBounds.min.y,
+        -(fittedBounds.min.z + fittedBounds.max.z) * .5
+      )
+      visual.traverse(object => {
+        if (object instanceof THREE.Mesh) {
+          object.castShadow = true
+          object.receiveShadow = true
+          if (Array.isArray(object.material)) object.material.forEach(material => { material.side = THREE.DoubleSide })
+          else object.material.side = THREE.DoubleSide
+        }
+      })
+      fighter.add(visual)
+
+      // Attach the existing weapon prop to the generated skeleton's right hand when available.
+      let rightHand: THREE.Bone | undefined
+      visual.traverse(object => {
+        if (object instanceof THREE.Bone && /right.?hand/i.test(object.name)) rightHand = object
+      })
+      if (weapon) {
+        if (rightHand) {
+          rightHand.add(weapon)
+          weapon.position.set(0, 0, 0)
+          weapon.rotation.set(Math.PI / 2, 0, Math.PI / 2)
+          weapon.scale.setScalar(.72)
+        } else {
+          fighter.add(weapon)
+          weapon.position.set(.34, 1.22, .18)
+          weapon.rotation.set(0, Math.PI, 0)
+          weapon.scale.setScalar(.72)
+        }
+      }
+      if (muzzle && weapon) {
+        weapon.add(muzzle)
+        muzzle.position.set(0, 0, -.42)
+        muzzle.rotation.set(0, 0, 0)
+      }
+
+      const mixer = new THREE.AnimationMixer(visual)
+      const clips = gltf.animations
+      const findClip = (pattern: RegExp) => clips.find(clip => pattern.test(clip.name))
+      const actions: Record<string, THREE.AnimationAction | undefined> = {
+        idle: findClip(/idle|stand|breath/i) ? mixer.clipAction(findClip(/idle|stand|breath/i)!) : undefined,
+        run: findClip(/run|walk|locomotion/i) ? mixer.clipAction(findClip(/run|walk|locomotion/i)!) : undefined,
+        shoot: findClip(/shoot|fire|attack/i) ? mixer.clipAction(findClip(/shoot|fire|attack/i)!) : undefined,
+        reload: findClip(/reload/i) ? mixer.clipAction(findClip(/reload/i)!) : undefined,
+        hit: findClip(/hit|damage/i) ? mixer.clipAction(findClip(/hit|damage/i)!) : undefined
+      }
+      if (!actions.idle && clips[0]) actions.idle = mixer.clipAction(clips[0])
+      fighter.userData.modelMixer = mixer
+      fighter.userData.modelActions = actions
+      fighter.userData.activeModelAction = ''
+      this.setCharacterAnimation(fighter, 'idle')
+    }, undefined, (error) => {
+      console.error(`Failed to load ${character} character model; keeping procedural fallback.`, error)
+    })
+  }
+
+  private setCharacterAnimation(fighter: THREE.Group, state: 'idle' | 'run' | 'shoot' | 'reload' | 'hit') {
+    const actions = fighter.userData.modelActions as Record<string, THREE.AnimationAction | undefined> | undefined
+    if (!actions) return
+    const next = actions[state] || actions.idle
+    if (!next || fighter.userData.activeModelAction === state) return
+    const previous = actions[fighter.userData.activeModelAction as string]
+    next.reset().fadeIn(.18).play()
+    previous?.fadeOut(.18)
+    fighter.userData.activeModelAction = state
   }
 
   private buildWeaponModel(model: THREE.Group, weapon: WeaponId) {
@@ -914,6 +1035,10 @@ export class RooftopArena {
     if (this.disposed) return
     this.frame = requestAnimationFrame(this.animate)
     const dt = Math.min(this.clock.getDelta(), .04)
+    ;[this.player, this.enemy].forEach(fighter => {
+      const mixer = fighter.userData.modelMixer as THREE.AnimationMixer | undefined
+      mixer?.update(dt)
+    })
     if (this.hitFeedbackTimer > 0) {
       this.hitFeedbackTimer = Math.max(0, this.hitFeedbackTimer - dt)
       if (this.hitFeedbackTimer === 0 && this.hitFeedback) { this.hitFeedback = ''; this.publish() }
@@ -961,6 +1086,7 @@ export class RooftopArena {
       const left = this.keys.has('KeyA') || this.touchKeys.has('KeyA')
       const right = this.keys.has('KeyD') || this.touchKeys.has('KeyD')
       const moving = forward || back || left || right
+      this.setCharacterAnimation(this.player, moving ? 'run' : 'idle')
       if (this.keys.has('KeyQ')) this.peekDirection = -1
       else if (this.keys.has('KeyE')) this.peekDirection = 1
       const nextX = this.player.position.x + (right ? speed : 0) - (left ? speed : 0)
@@ -1068,6 +1194,7 @@ export class RooftopArena {
       this.enemy.position.z = THREE.MathUtils.damp(this.enemy.position.z, enemyTargetZ, 3.8, dt)
       const enemyLegs = this.enemy.userData.legs as THREE.Mesh[]
       const enemyMoving = Math.abs(this.enemy.position.x - enemyTargetX) > .12 || Math.abs(this.enemy.position.z - enemyTargetZ) > .12
+      this.setCharacterAnimation(this.enemy, enemyMoving ? 'run' : 'idle')
       enemyLegs.forEach((leg, index) => {
         const stride = enemyMoving ? Math.sin(this.enemyWalkTime * 7 + index * Math.PI) * .38 : Math.sin(this.enemyWalkTime * 1.8 + index * Math.PI) * .025
         leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.enemyCovering ? -.72 + stride * .2 : stride, 9, dt)
@@ -1154,6 +1281,7 @@ export class RooftopArena {
         }
         const remoteLegs = this.enemy.userData.legs as THREE.Mesh[]
         const remoteMoving = Math.hypot(this.remoteTarget.x - this.enemy.position.x, this.remoteTarget.z - this.enemy.position.z) > .12
+        this.setCharacterAnimation(this.enemy, remoteMoving ? 'run' : 'idle')
         remoteLegs.forEach((leg, index) => {
           const stride = remoteMoving ? Math.sin(this.enemyWalkTime * 7 + index * Math.PI) * .38 : 0
           leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.remoteCrouched ? -.62 + stride * .2 : stride, 9, dt)
