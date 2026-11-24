@@ -33,7 +33,7 @@
     ],
     "garmentStyles": {
       "singlet": {
-        "pattern": "solid",
+        "pattern": "rib",
         "color": "#dedbe3",
         "color2": "#dedbe3"
       },
