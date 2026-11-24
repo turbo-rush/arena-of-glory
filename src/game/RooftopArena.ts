@@ -22,6 +22,7 @@ const ARENAS = [
 export class RooftopArena {
   private scene = new THREE.Scene()
   private characterLoader = new GLTFLoader()
+  private readonly lowPowerDevice = window.matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 4) <= 4
   private camera = new THREE.PerspectiveCamera(52, 1, 0.1, 300)
   private renderer: THREE.WebGLRenderer
   private player!: THREE.Group
@@ -120,9 +121,9 @@ export class RooftopArena {
 
   constructor(host: HTMLElement, listener: StateListener) {
     this.host = host; this.listener = listener
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7))
-    this.renderer.shadowMap.enabled = true
+    this.renderer = new THREE.WebGLRenderer({ antialias: !this.lowPowerDevice, alpha: false, powerPreference: 'high-performance' })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 1.2 : 1.65))
+    this.renderer.shadowMap.enabled = !this.lowPowerDevice
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -148,7 +149,7 @@ export class RooftopArena {
   private buildWorld() {
     this.hemisphere = new THREE.HemisphereLight('#dceaff', '#33303b', 2.1); this.scene.add(this.hemisphere)
     this.sun = new THREE.DirectionalLight('#ffe0b1', 3.2)
-    this.sun.position.set(-12, 24, 10); this.sun.castShadow = true; this.sun.shadow.mapSize.set(1024, 1024); this.scene.add(this.sun)
+    this.sun.position.set(-12, 24, 10); this.sun.castShadow = true; this.sun.shadow.mapSize.set(this.lowPowerDevice ? 512 : 1024, this.lowPowerDevice ? 512 : 1024); this.scene.add(this.sun)
     this.ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), this.material('#4c5058'))
     this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -3.1; this.ground.receiveShadow = true; this.scene.add(this.ground)
     // Distant city skyline
