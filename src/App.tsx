@@ -169,8 +169,11 @@ export default function App() {
       const room = await createDuelRoom()
       const url = new URL(room.websocketUrl)
       url.searchParams.set('name', displayName.trim().slice(0, 20) || 'PLAYER')
-      const invite = new URL(window.location.href)
-      invite.searchParams.set('room', room.roomCode)
+      const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '')
+      const invite = botUsername
+        ? new URL(`https://t.me/${botUsername}?startapp=room_${room.roomCode}`)
+        : new URL(window.location.href)
+      if (!botUsername) invite.searchParams.set('room', room.roomCode)
       setInviteLink(invite.toString())
       await connectToRoom(url.toString(), room.roomCode)
     } catch (error) {
@@ -179,12 +182,15 @@ export default function App() {
     }
   }
 
-  const joinRoom = async (code: string) => {
+  const joinRoom = async (code: string, playerName = displayName) => {
     try {
       const normalizedCode = code.trim().toUpperCase()
-      const url = duelRoomWebSocketUrl(normalizedCode, displayName)
-      const invite = new URL(window.location.href)
-      invite.searchParams.set('room', normalizedCode)
+      const url = duelRoomWebSocketUrl(normalizedCode, playerName)
+      const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '')
+      const invite = botUsername
+        ? new URL(`https://t.me/${botUsername}?startapp=room_${normalizedCode}`)
+        : new URL(window.location.href)
+      if (!botUsername) invite.searchParams.set('room', normalizedCode)
       setInviteLink(invite.toString())
       await connectToRoom(url, normalizedCode)
     } catch (error) {
@@ -193,7 +199,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    const inviteCode = new URLSearchParams(window.location.search).get('room')
+    const telegram = (window as Window & { Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string; user?: { first_name?: string; username?: string } } } } }).Telegram?.WebApp
+    const telegramUser = telegram?.initDataUnsafe?.user
+    const startParam = telegram?.initDataUnsafe?.start_param ?? new URLSearchParams(window.location.search).get('tgWebAppStartParam') ?? ''
+    const startRoom = startParam.match(/^room_([A-HJ-NP-Z2-9]{6})$/i)?.[1]
+    const inviteCode = startRoom ?? new URLSearchParams(window.location.search).get('room')
+    const launchName = telegramUser?.first_name || telegramUser?.username || displayName
+    if (telegramUser?.first_name || telegramUser?.username) setDisplayName(launchName)
     try {
       const raw = sessionStorage.getItem(resumeStorageKey)
       if (raw) {
@@ -211,7 +223,7 @@ export default function App() {
         if (!inviteMatches) sessionStorage.removeItem(resumeStorageKey)
       }
     } catch { /* ignore malformed or unavailable session storage */ }
-    if (inviteCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(inviteCode)) void joinRoom(inviteCode)
+    if (inviteCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(inviteCode)) void joinRoom(inviteCode, launchName)
   }, [])
 
   const setReady = () => {
