@@ -122,7 +122,7 @@ export class RooftopArena {
   constructor(host: HTMLElement, listener: StateListener) {
     this.host = host; this.listener = listener
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.lowPowerDevice, alpha: false, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 0.85 : 1.5))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 0.65 : 1.25))
     this.renderer.shadowMap.enabled = false
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -153,7 +153,7 @@ export class RooftopArena {
     this.ground = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), this.material('#4c5058'))
     this.ground.rotation.x = -Math.PI / 2; this.ground.position.y = -3.1; this.ground.receiveShadow = true; this.scene.add(this.ground)
     // Distant city skyline
-    for (let i = 0; i < 38; i++) {
+    for (let i = 0; i < (this.lowPowerDevice ? 12 : 38); i++) {
       const x = (i % 10 - 5) * 8 + Math.sin(i * 4) * 2
       const z = -36 - Math.floor(i / 10) * 15
       const h = 5 + (i * 13 % 17)
@@ -476,6 +476,9 @@ export class RooftopArena {
   }
 
   private loadCharacterModel(fighter: THREE.Group, character: 'volt' | 'vex') {
+    // Keep low-memory mobile WebViews on the lightweight fallback rig to avoid
+    // decoding two 15–17 MB skinned GLBs and exhausting GPU/JS memory.
+    if (this.lowPowerDevice) return
     this.characterLoader.load(`/models/${character}.glb`, (gltf) => {
       if (this.disposed || !fighter.parent) {
         gltf.scene.traverse(object => {
