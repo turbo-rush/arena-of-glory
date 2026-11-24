@@ -369,18 +369,49 @@ export class RooftopArena {
       addSphere(leg, 0, -.22, .15, .14, .075, .045, secondary)
       addSphere(leg, 0, -.1, .16, .15, .09, .05, isVolt ? metal : secondary)
     }
+    // Character-specific streetwear tailoring: cargo pockets, articulated knee guards and layered sneaker soles.
+    legs.forEach((leg, index) => {
+      const side = index === 0 ? -1 : 1
+      addBox(leg, .17, .17, .075, side * .105, .035, .105, isVolt ? secondary : accent, side * -.08)
+      addBox(leg, .19, .045, .09, side * .105, -.035, .153, metal, side * -.08)
+      addBox(leg, .205, .15, .09, 0, -.12, .145, isVolt ? rubber : secondary)
+      addBox(leg, .16, .035, .105, 0, -.12, .197, accent)
+      addBox(leg, isVolt ? .34 : .31, .045, .46, 0, -.39, -.08, rubber)
+      addBox(leg, isVolt ? .28 : .26, .025, .39, 0, -.365, -.075, accent)
+      addBox(leg, .075, .055, .025, side * .07, -.22, .205, metal)
+    })
+
+    // A diagonal utility harness, compact shoulder webbing and reinforced cuff seams add layered material reads.
+    const harnessMaterial = this.material(isVolt ? '#3a4654' : '#47344f', .82)
+    const harnessPath = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-.34, 1.62, .255),
+      new THREE.Vector3(-.2, 1.48, .27),
+      new THREE.Vector3(0, 1.28, .275),
+      new THREE.Vector3(.22, 1.08, .27),
+      new THREE.Vector3(.34, .91, .245)
+    ])
+    const harness = new THREE.Mesh(new THREE.TubeGeometry(harnessPath, 16, .035, 6, false), harnessMaterial)
+    harness.castShadow = true
+    group.add(harness)
+    addBox(group, .12, .14, .055, .13, 1.34, .3, metal, -.55)
+    addBox(group, .09, .11, .045, .18, 1.27, .31, accent, -.55)
+
     // Distinctive gloves and forearm guards.
     const leftArm = new THREE.Group(); leftArm.position.set(-.43, 1.42, -.08); group.add(leftArm)
     const leftSleeve = new THREE.Mesh(new THREE.CapsuleGeometry(.105, .42, 4, 10), cloth)
     leftSleeve.rotation.z = .08; leftSleeve.position.set(0, -.3, 0); leftArm.add(leftSleeve)
     addSphere(leftArm, 0, -.58, .015, .12, .09, .13, rubber)
     addSphere(leftArm, 0, -.43, .015, .125, .055, .135, accent)
+    addBox(leftArm, .22, .055, .19, 0, -.49, .015, metal)
+    addBox(leftArm, .12, .035, .2, 0, -.49, .12, secondary)
 
     const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
     const armMesh = new THREE.Mesh(new THREE.CapsuleGeometry(.105, .48, 4, 10), cloth)
     armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
     addSphere(arm, 0, -.56, .02, .12, .09, .13, rubber)
     addSphere(arm, 0, -.43, .02, .125, .055, .135, accent)
+    addBox(arm, .22, .055, .19, 0, -.49, .02, metal)
+    addBox(arm, .12, .035, .2, 0, -.49, .125, secondary)
     const gun = new THREE.Group(); gun.position.set(.03, -.38, -.48); arm.add(gun)
     group.userData.weaponModel = gun
     const muzzle = new THREE.Mesh(new THREE.OctahedronGeometry(.13, 0), new THREE.MeshBasicMaterial({ color: '#ffb34f' }))
