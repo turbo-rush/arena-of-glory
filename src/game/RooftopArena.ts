@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { DuelInput } from '../net/duelTransport'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
@@ -265,7 +266,8 @@ export class RooftopArena {
     const rubber = this.material('#111722', .96)
     const metal = this.material('#65717e', .38)
     const addBox = (parent: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material, rz = 0) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
+      const radius = Math.min(w, h, d) * .18
+      const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, radius), mat)
       mesh.position.set(x, y, z); mesh.rotation.z = rz; mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh)
       return mesh
     }
@@ -281,7 +283,8 @@ export class RooftopArena {
     }
 
     // Shared athletic base silhouette; hit zones stay on the torso and head.
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(isVolt ? .76 : .64, 1.05, .42), cloth)
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(isVolt ? .34 : .3, isVolt ? .38 : .45, 5, 12), cloth)
+    torso.scale.set(isVolt ? 1.08 : 1, 1, .72)
     torso.position.y = 1.2; torso.castShadow = true; torso.userData.hitZone = 'body'; group.add(torso)
     group.userData.character = character
     // Layered street-fighter tailoring: cropped panels, reinforced shoulders and utility details.
@@ -358,24 +361,26 @@ export class RooftopArena {
 
     const legs: THREE.Mesh[] = []
     for (const x of (isVolt ? [-.23, .23] : [-.18, .18])) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(isVolt ? .27 : .23, .7, .3), pants)
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(isVolt ? .135 : .115, .42, 4, 10), pants)
+      leg.scale.z = .92
       leg.position.set(x, .36, 0); leg.castShadow = true; group.add(leg); legs.push(leg)
-      addBox(leg, isVolt ? .38 : .34, .2, .46, 0, -.34, -.075, rubber)
-      addBox(leg, isVolt ? .39 : .35, .06, .47, 0, -.27, -.075, accent)
-      addBox(leg, .27, .12, .08, 0, .02, .17, secondary)
-      addBox(leg, .29, .2, .08, 0, .12, .17, isVolt ? metal : secondary)
+      addSphere(leg, 0, -.31, -.08, isVolt ? .22 : .2, .105, .31, rubber)
+      addSphere(leg, 0, -.36, -.08, isVolt ? .225 : .205, .035, .315, accent)
+      addSphere(leg, 0, -.22, .15, .14, .075, .045, secondary)
+      addSphere(leg, 0, -.1, .16, .15, .09, .05, isVolt ? metal : secondary)
     }
     // Distinctive gloves and forearm guards.
     const leftArm = new THREE.Group(); leftArm.position.set(-.43, 1.42, -.08); group.add(leftArm)
-    addBox(leftArm, .2, .68, .22, 0, -.3, 0, cloth, .12)
-    addBox(leftArm, .22, .18, .24, 0, -.58, .015, rubber)
-    addBox(leftArm, .23, .12, .24, 0, -.43, .015, accent)
+    const leftSleeve = new THREE.Mesh(new THREE.CapsuleGeometry(.105, .42, 4, 10), cloth)
+    leftSleeve.rotation.z = .08; leftSleeve.position.set(0, -.3, 0); leftArm.add(leftSleeve)
+    addSphere(leftArm, 0, -.58, .015, .12, .09, .13, rubber)
+    addSphere(leftArm, 0, -.43, .015, .125, .055, .135, accent)
 
     const arm = new THREE.Group(); arm.position.set(.43, 1.42, -.1); group.add(arm)
-    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .72, .22), cloth)
+    const armMesh = new THREE.Mesh(new THREE.CapsuleGeometry(.105, .48, 4, 10), cloth)
     armMesh.position.y = -.3; armMesh.rotation.x = -.8; armMesh.rotation.z = -.15; arm.add(armMesh)
-    addBox(arm, .23, .16, .24, 0, -.56, .02, rubber)
-    addBox(arm, .23, .1, .24, 0, -.43, .02, accent)
+    addSphere(arm, 0, -.56, .02, .12, .09, .13, rubber)
+    addSphere(arm, 0, -.43, .02, .125, .055, .135, accent)
     const gun = new THREE.Group(); gun.position.set(.03, -.38, -.48); arm.add(gun)
     group.userData.weaponModel = gun
     const muzzle = new THREE.Mesh(new THREE.OctahedronGeometry(.13, 0), new THREE.MeshBasicMaterial({ color: '#ffb34f' }))
