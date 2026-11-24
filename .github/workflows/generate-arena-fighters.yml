@@ -42,13 +42,20 @@ jobs:
             --animations locomotion,shooter,combat \
             --out generated
 
-      - name: Validate generated GLB containers
+      - name: Build optimized mobile fighter assets
+        run: |
+          npx --yes "@gltf-transform/cli@4.5.1" optimize generated/volt.glb generated/volt-mobile.glb \
+            --simplify-ratio 0.72 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
+          npx --yes "@gltf-transform/cli@4.5.1" optimize generated/vex.glb generated/vex-mobile.glb \
+            --simplify-ratio 0.72 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
+
+      - name: Validate generated desktop and mobile GLB containers
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          for (const name of ['volt', 'vex']) {
+          for (const name of ['volt', 'vex', 'volt-mobile', 'vex-mobile']) {
             const path = `generated/${name}.glb`;
-            if (!fs.existsSync(path)) throw new Error(`Ara did not create ${path}`);
+            if (!fs.existsSync(path)) throw new Error(`Missing model output: ${path}`);
             const data = fs.readFileSync(path);
             if (data.length < 20 || data.toString('ascii', 0, 4) !== 'glTF' ||
                 data.readUInt32LE(4) !== 2 || data.readUInt32LE(8) !== data.length) {
