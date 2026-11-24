@@ -328,6 +328,7 @@ export class RooftopArena {
       addBox(group, .12, .28, .08, -.2, 2.02, .08, hair, -.22)
       addBox(group, .12, .24, .08, .2, 2.02, .08, hair, .2)
       const pony = new THREE.Group(); pony.position.set(.02, 2.13, -.19); group.add(pony)
+      group.userData.pony = pony
       addSphere(pony, .02, .15, -.08, .14, .2, .15, hair)
       addSphere(pony, .05, .34, -.18, .12, .22, .13, hair)
       addSphere(pony, .1, .53, -.3, .1, .2, .11, hair)
@@ -898,6 +899,17 @@ export class RooftopArena {
       this.player.rotation.y = Math.PI
       const playerLegs = this.player.userData.legs as THREE.Mesh[]
       playerLegs.forEach((leg, index) => { const walk = moving ? Math.sin(this.walkTime + index * Math.PI) * .62 : 0; leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.crouched ? -.85 + walk * .25 : walk, 10, dt) })
+      const playerTorso = this.player.userData.torso as THREE.Mesh
+      const playerHead = this.player.userData.head as THREE.Mesh
+      const playerPony = this.player.userData.pony as THREE.Group | undefined
+      const playerShoulders = this.player.userData.shoulderPads as THREE.Group | undefined
+      const heroIsVex = this.player.userData.character === 'vex'
+      const gait = moving ? Math.sin(this.walkTime * (heroIsVex ? 1.18 : .92)) : 0
+      playerTorso.rotation.z = THREE.MathUtils.damp(playerTorso.rotation.z, moving ? gait * (heroIsVex ? .075 : .045) : Math.sin(this.walkTime * 1.2) * .012, 8, dt)
+      playerTorso.scale.y = THREE.MathUtils.damp(playerTorso.scale.y, 1 + Math.sin(this.walkTime * 2) * (moving ? .012 : .018), 8, dt)
+      playerHead.rotation.z = THREE.MathUtils.damp(playerHead.rotation.z, moving ? -gait * (heroIsVex ? .035 : .018) : 0, 8, dt)
+      if (playerPony) { playerPony.rotation.x = THREE.MathUtils.damp(playerPony.rotation.x, moving ? -.16 + Math.sin(this.walkTime * 1.8) * .22 : Math.sin(this.walkTime * 1.1) * .035, 7, dt); playerPony.rotation.z = THREE.MathUtils.damp(playerPony.rotation.z, moving ? gait * .16 : 0, 7, dt) }
+      if (playerShoulders) playerShoulders.rotation.z = THREE.MathUtils.damp(playerShoulders.rotation.z, moving ? -gait * (heroIsVex ? .07 : .035) : 0, 8, dt)
       const targetCrouchY = this.crouched ? -.42 : 0
       this.player.position.y = targetCrouchY + (moving && !this.crouched ? Math.abs(Math.sin(this.walkTime * 2)) * .07 : 0)
       this.player.rotation.z = THREE.MathUtils.damp(this.player.rotation.z, this.peekDirection * -.2, 9, dt)
@@ -992,6 +1004,11 @@ export class RooftopArena {
       enemyTorsoGroup.rotation.z = THREE.MathUtils.damp(enemyTorsoGroup.rotation.z, Math.sin(this.enemyWalkTime * 1.7) * (enemyMoving ? .045 : .018), 7, dt)
       const enemyHead = this.enemy.userData.head as THREE.Mesh
       enemyHead.rotation.x = THREE.MathUtils.damp(enemyHead.rotation.x, Math.sin(this.enemyWalkTime * 1.35) * .035, 6, dt)
+      const enemyPony = this.enemy.userData.pony as THREE.Group | undefined
+      const enemyShoulders = this.enemy.userData.shoulderPads as THREE.Group | undefined
+      const enemyIsVex = this.enemy.userData.character === 'vex'
+      if (enemyPony) { enemyPony.rotation.x = THREE.MathUtils.damp(enemyPony.rotation.x, enemyMoving ? -.14 + Math.sin(this.enemyWalkTime * 2.1) * .2 : Math.sin(this.enemyWalkTime) * .025, 7, dt); enemyPony.rotation.z = THREE.MathUtils.damp(enemyPony.rotation.z, enemyMoving ? Math.sin(this.enemyWalkTime * 1.2) * .14 : 0, 7, dt) }
+      if (enemyShoulders) enemyShoulders.rotation.z = THREE.MathUtils.damp(enemyShoulders.rotation.z, enemyMoving ? Math.sin(this.enemyWalkTime * (enemyIsVex ? 8.3 : 6.8)) * (enemyIsVex ? .065 : .035) : 0, 8, dt)
       // Keep the weapon raised toward the player; lower it slightly while tucked behind cover.
       const enemyArm = this.enemy.userData.arm as THREE.Group
       // Telegraph incoming shots by raising the weapon before the actual hit check.
