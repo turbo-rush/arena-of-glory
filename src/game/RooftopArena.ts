@@ -124,7 +124,7 @@ export class RooftopArena {
     this.host = host; this.listener = listener
     this.characterLoader.setMeshoptDecoder(MeshoptDecoder)
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.lowPowerDevice, alpha: false, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 1 : 1.25))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 1.1 : 1.25))
     this.renderer.shadowMap.enabled = false
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -203,9 +203,9 @@ export class RooftopArena {
     this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
     this.addRoofGraphics(far, 15, 12, '#ffbd70')
     this.player = this.createFighter('volt')
-    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
+    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.78); roof.add(this.player)
     this.enemy = this.createFighter('vex')
-    this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(0.64); far.add(this.enemy)
+    this.enemy.position.set(-1.4, 0, 0.8); this.enemy.scale.setScalar(0.78); far.add(this.enemy)
     this.rebuildWeaponModel()
     // Camera follows just behind the player, looking toward the rival rooftop.
     this.camera.position.set(0, 7.4, 20.2)
