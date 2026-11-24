@@ -25,6 +25,12 @@ export default function App() {
   const resumeStorageKey = 'arena-of-glory:duel-resume'
 
   useEffect(() => {
+    const telegram = (window as Window & { Telegram?: { WebApp?: { ready?: () => void; expand?: () => void } } }).Telegram?.WebApp
+    telegram?.ready?.()
+    telegram?.expand?.()
+  }, [])
+
+  useEffect(() => {
     if (!mountRef.current) return
     const game = new RooftopArena(mountRef.current, setState)
     gameRef.current = game
@@ -232,9 +238,17 @@ export default function App() {
 
   const shareInvite = async () => {
     if (!inviteLink) return
+    const telegram = (window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }).Telegram?.WebApp
+    const shareText = 'Join my ARENA OF GLORY rooftop duel!'
     try {
-      if (navigator.share) await navigator.share({ title: 'ARENA OF GLORY — Duel invitation', text: 'Join my rooftop duel!', url: inviteLink })
-      else {
+      if (telegram?.openTelegramLink) {
+        const shareUrl = new URL('https://t.me/share/url')
+        shareUrl.searchParams.set('url', inviteLink)
+        shareUrl.searchParams.set('text', shareText)
+        telegram.openTelegramLink(shareUrl.toString())
+      } else if (navigator.share) {
+        await navigator.share({ title: 'ARENA OF GLORY — Duel invitation', text: shareText, url: inviteLink })
+      } else {
         await navigator.clipboard.writeText(inviteLink)
         setRoomError('Invite link copied. Send it to your friend.')
       }
