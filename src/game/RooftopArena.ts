@@ -373,6 +373,10 @@ export class RooftopArena {
     group.userData.head = head
     group.userData.arm = arm
     group.userData.legs = legs
+    const shoulderPads = new THREE.Group(); shoulderPads.position.y = 1.62; group.add(shoulderPads)
+    addBox(shoulderPads, .2, .12, .25, -.38, 0, 0, secondary, -.12)
+    addBox(shoulderPads, .2, .12, .25, .38, 0, 0, accent, .12)
+    group.userData.shoulderPads = shoulderPads
     // Character-specific forearm guards and a visible shoulder badge.
     addBox(leftArm, .25, .18, .25, 0, -.12, .015, secondary)
     addBox(group, .18, .18, .035, isVolt ? -.39 : .39, 1.61, .245, accent, isVolt ? -.12 : .12)
