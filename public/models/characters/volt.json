@@ -1,0 +1,82 @@
+{
+  "$schema": "https://ara3dgen.com/schemas/character.v1.json",
+  "kind": "ara-character",
+  "version": 1,
+  "preset": "Athletic man",
+  "params": {
+    "name": "volt",
+    "seed": 4107,
+    "ageYears": 28,
+    "gender": 1,
+    "muscle": 0.78,
+    "weight": 0.46,
+    "height": 0.58,
+    "proportions": 0.78,
+    "african": 0.2,
+    "asian": 0.12,
+    "caucasian": 0.68,
+    "hair": "short03",
+    "hairTint": "#ffffff",
+    "hairColor": "#211a18",
+    "eyes": "darkbrown",
+    "eyebrows": "eyebrow003",
+    "outfit": "none",
+    "top": "singlet",
+    "jacket": "racing_jacket",
+    "bottom": "cargo_pants",
+    "shoes": "sneakers",
+    "accessories": [
+      "gloves",
+      "utility_belt",
+      "neon_accents"
+    ],
+    "garmentStyles": {
+      "singlet": {
+        "pattern": "solid",
+        "color": "#d8d8d2",
+        "color2": "#d8d8d2"
+      },
+      "racing_jacket": {
+        "pattern": "solid",
+        "color": "#202126",
+        "color2": "#f06a1b"
+      },
+      "cargo_pants": {
+        "pattern": "solid",
+        "color": "#202126",
+        "color2": "#34363d"
+      },
+      "sneakers": {
+        "pattern": "solid",
+        "color": "#202126",
+        "color2": "#f06a1b"
+      },
+      "gloves": {
+        "pattern": "leather",
+        "color": "#17181c",
+        "color2": "#f06a1b"
+      },
+      "utility_belt": {
+        "pattern": "leather",
+        "color": "#17181c",
+        "color2": "#f06a1b"
+      },
+      "neon_accents": {
+        "pattern": "solid",
+        "color": "#f06a1b",
+        "color2": "#f06a1b"
+      }
+    },
+    "detail": "high",
+    "rig": "game",
+    "restPose": "T",
+    "faceBones": true,
+    "faceShapes": true,
+    "speechShapes": false,
+    "expression": "determined",
+    "animations": true,
+    "weapon": "none",
+    "carry": "none",
+    "vehicle": "none"
+  }
+}
