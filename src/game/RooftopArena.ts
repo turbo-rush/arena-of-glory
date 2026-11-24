@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import type { DuelInput } from '../net/duelTransport'
 
 export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper'
@@ -121,6 +122,7 @@ export class RooftopArena {
 
   constructor(host: HTMLElement, listener: StateListener) {
     this.host = host; this.listener = listener
+    this.characterLoader.setMeshoptDecoder(MeshoptDecoder)
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.lowPowerDevice, alpha: false, powerPreference: 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 0.65 : 1.25))
     this.renderer.shadowMap.enabled = false
@@ -476,10 +478,11 @@ export class RooftopArena {
   }
 
   private loadCharacterModel(fighter: THREE.Group, character: 'volt' | 'vex') {
-    // Keep low-memory mobile WebViews on the lightweight fallback rig to avoid
-    // decoding two 15–17 MB skinned GLBs and exhausting GPU/JS memory.
-    if (this.lowPowerDevice) return
-    this.characterLoader.load(`/models/${character}.glb`, (gltf) => {
+    // Mobile devices use separately optimized assets; desktop keeps the high-detail originals.
+    const modelPath = this.lowPowerDevice
+      ? `/models/${character}-mobile.glb`
+      : `/models/${character}.glb`
+    this.characterLoader.load(modelPath, (gltf) => {
       if (this.disposed || !fighter.parent) {
         gltf.scene.traverse(object => {
           const mesh = object as THREE.Mesh
@@ -565,7 +568,7 @@ export class RooftopArena {
       fighter.userData.modelActionHold = 0
       this.setCharacterAnimation(fighter, 'idle')
     }, undefined, (error) => {
-      console.error(`Failed to load ${character} character model; keeping procedural fallback.`, error)
+      console.error(`Failed to load ${character} character model from ${modelPath}; keeping emergency fallback.`, error)
     })
   }
 
