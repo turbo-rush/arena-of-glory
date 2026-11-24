@@ -124,7 +124,7 @@ export class RooftopArena {
     this.host = host; this.listener = listener
     this.characterLoader.setMeshoptDecoder(MeshoptDecoder)
     this.renderer = new THREE.WebGLRenderer({ antialias: !this.lowPowerDevice, alpha: false, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 0.65 : 1.25))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.lowPowerDevice ? 1 : 1.25))
     this.renderer.shadowMap.enabled = false
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -205,7 +205,7 @@ export class RooftopArena {
     this.player = this.createFighter('volt')
     this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.64); roof.add(this.player)
     this.enemy = this.createFighter('vex')
-    this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(1.28); far.add(this.enemy)
+    this.enemy.position.set(1.4, 0, -1.7); this.enemy.scale.setScalar(0.64); far.add(this.enemy)
     this.rebuildWeaponModel()
     // Camera follows just behind the player, looking toward the rival rooftop.
     this.camera.position.set(0, 7.4, 20.2)
@@ -918,7 +918,7 @@ export class RooftopArena {
       return
     }
     const config = WEAPONS[this.weapon]
-    const origin = new THREE.Vector3(); this.player.localToWorld(origin.set(.46, 1.04, .35))
+    const origin = this.getMuzzleWorldPosition(this.player)
     let totalDamage = 0
     let headHits = 0
     this.enemy.updateMatrixWorld(true)
@@ -985,10 +985,16 @@ export class RooftopArena {
     }
   }
 
+  private getMuzzleWorldPosition(fighter: THREE.Group) {
+    fighter.updateMatrixWorld(true)
+    const muzzle = fighter.userData.muzzle as THREE.Mesh | undefined
+    if (muzzle) return muzzle.getWorldPosition(new THREE.Vector3())
+    return fighter.localToWorld(new THREE.Vector3(.46, 1.04, .35))
+  }
+
   private showTracer(hit: boolean) {
     if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer = null }
-    const start = new THREE.Vector3(); const end = new THREE.Vector3()
-    this.player.localToWorld(start.set(.46, 1.04, .35))
+    const start = this.getMuzzleWorldPosition(this.player); const end = new THREE.Vector3()
     this.enemy.localToWorld(end.set(0, 1.2, 0))
     const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
     const tracerColor = this.weapon === 'sniper' ? '#9fe8ff' : this.weapon === 'shotgun' ? '#ffb45f' : this.weapon === 'rifle' ? '#ffdf8a' : '#ffd18a'
@@ -1244,7 +1250,7 @@ export class RooftopArena {
         enemyArm.rotation.x = THREE.MathUtils.damp(enemyArm.rotation.x, -.62, 12, dt)
         if (this.enemyShotWindup === 0) {
           const protectedByCover = this.isPlayerProtected()
-          const enemyOrigin = new THREE.Vector3(); this.enemy.localToWorld(enemyOrigin.set(.46, 1.04, .35))
+          const enemyOrigin = this.getMuzzleWorldPosition(this.enemy)
           const playerTarget = new THREE.Vector3(); this.player.localToWorld(playerTarget.set(0, this.crouched ? .78 : 1.2, 0))
           // Lead a moving target slightly so sustained lateral movement remains useful but not invulnerable.
           const leadTime = this.weapon === 'shotgun' ? .1 : this.weapon === 'sniper' ? .2 : .16
