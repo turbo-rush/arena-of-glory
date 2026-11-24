@@ -1,0 +1,67 @@
+name: Generate Arena Fighters
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/models/characters/*.json"
+      - ".github/workflows/generate-arena-fighters.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      ARA3D_VERSION: "0.14.0"
+      ARA3D_CACHE: ${{ github.workspace }}/.ara3d-cache
+    steps:
+      - name: Check out character recipes
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache Ara character data
+        uses: actions/cache@v4
+        with:
+          path: .ara3d-cache
+          key: ara3d-data-${{ runner.os }}-${{ env.ARA3D_VERSION }}
+
+      - name: Generate rigged VOLT and VEX models
+        run: |
+          npx --yes "ara3d@${ARA3D_VERSION}" export \
+            --params public/models/characters/volt.json \
+            --params public/models/characters/vex.json \
+            --formats glb \
+            --detail high \
+            --animations locomotion,shooter,combat \
+            --out generated
+
+      - name: Validate generated GLB containers
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          for (const name of ['volt', 'vex']) {
+            const path = `generated/${name}.glb`;
+            if (!fs.existsSync(path)) throw new Error(`Ara did not create ${path}`);
+            const data = fs.readFileSync(path);
+            if (data.length < 20 || data.toString('ascii', 0, 4) !== 'glTF' ||
+                data.readUInt32LE(4) !== 2 || data.readUInt32LE(8) !== data.length) {
+              throw new Error(`Invalid GLB output: ${path}`);
+            }
+            console.log(`${path}: ${(data.length / 1048576).toFixed(2)} MB`);
+          }
+          NODE
+
+      - name: Upload generated models for trusted publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-fighter-models
+          path: generated/*.glb
+          if-no-files-found: error
+          retention-days: 7
