@@ -1,0 +1,83 @@
+{
+  "$schema": "https://ara3dgen.com/schemas/character.v1.json",
+  "kind": "ara-character",
+  "version": 1,
+  "preset": "Athletic woman",
+  "params": {
+    "name": "vex",
+    "seed": 4108,
+    "ageYears": 27,
+    "gender": 0,
+    "muscle": 0.68,
+    "weight": 0.4,
+    "height": 0.56,
+    "proportions": 0.82,
+    "african": 0.12,
+    "asian": 0.18,
+    "caucasian": 0.7,
+    "hair": "ponytail01",
+    "hairTint": "#ff43c8",
+    "hairColor": "#ff43c8",
+    "eyes": "ice",
+    "eyebrows": "eyebrow010",
+    "eyelashes": "eyelashes02",
+    "outfit": "none",
+    "top": "singlet",
+    "jacket": "racing_jacket",
+    "bottom": "techwear_pants",
+    "shoes": "sneakers",
+    "accessories": [
+      "gloves",
+      "utility_belt",
+      "neon_accents"
+    ],
+    "garmentStyles": {
+      "singlet": {
+        "pattern": "solid",
+        "color": "#dedbe3",
+        "color2": "#dedbe3"
+      },
+      "racing_jacket": {
+        "pattern": "solid",
+        "color": "#1b1b22",
+        "color2": "#a33be8"
+      },
+      "techwear_pants": {
+        "pattern": "techwear",
+        "color": "#202027",
+        "color2": "#a33be8"
+      },
+      "sneakers": {
+        "pattern": "solid",
+        "color": "#19191f",
+        "color2": "#e83bb7"
+      },
+      "gloves": {
+        "pattern": "leather",
+        "color": "#17171d",
+        "color2": "#e83bb7"
+      },
+      "utility_belt": {
+        "pattern": "leather",
+        "color": "#17171d",
+        "color2": "#a33be8"
+      },
+      "neon_accents": {
+        "pattern": "solid",
+        "color": "#e83bb7",
+        "color2": "#a33be8"
+      }
+    },
+    "detail": "high",
+    "rig": "game",
+    "restPose": "T",
+    "faceBones": true,
+    "faceShapes": true,
+    "speechShapes": false,
+    "expression": "determined",
+    "animations": true,
+    "weapon": "none",
+    "carry": "none",
+    "vehicle": "none"
+  }
+}
