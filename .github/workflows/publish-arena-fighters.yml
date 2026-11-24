@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('node:fs');
-          for (const name of ['volt', 'vex']) {
+          for (const name of ['volt', 'vex', 'volt-mobile', 'vex-mobile']) {
             const path = `generated/${name}.glb`;
             if (!fs.existsSync(path)) throw new Error(`Missing ${path}`);
             const data = fs.readFileSync(path);
@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/models/volt.glb public/models/vex.glb
+          git add public/models/volt.glb public/models/vex.glb public/models/volt-mobile.glb public/models/vex-mobile.glb
           if git diff --cached --quiet; then
             echo "Generated models are unchanged."
             exit 0
