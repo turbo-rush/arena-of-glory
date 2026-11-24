@@ -33,6 +33,8 @@ export default function App() {
 
   useEffect(() => () => transportRef.current?.suspend(), [])
 
+  useEffect(() => { gameRef.current?.setPlayerHero(selectedHero) }, [selectedHero])
+
   const connectToRoom = async (url: string, code: string) => {
     transportRef.current?.close()
     gameRef.current?.stopOnline()
