@@ -45,9 +45,9 @@ jobs:
       - name: Build optimized mobile fighter assets
         run: |
           npx --yes "@gltf-transform/cli@4.5.1" optimize generated/volt.glb generated/volt-mobile.glb \
-            --simplify-ratio 0.72 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
+            --simplify-ratio 0.88 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
           npx --yes "@gltf-transform/cli@4.5.1" optimize generated/vex.glb generated/vex-mobile.glb \
-            --simplify-ratio 0.72 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
+            --simplify-ratio 0.88 --texture-compress webp --texture-size 1024 --compress meshopt --no-palette
 
       - name: Validate generated desktop and mobile GLB containers
         run: |
