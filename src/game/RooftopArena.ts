@@ -300,12 +300,24 @@ export class RooftopArena {
     addBox(group, .58, .11, .46, 0, .76, 0, rubber)
     addBox(group, .16, .13, .08, 0, .76, .27, metal)
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 12, 10), skin)
-    head.position.y = 1.93; head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
-    addBox(group, .22, .16, .2, 0, 2.19, -.015, skin)
-    // Face details are deliberately subtle so the silhouette reads at phone scale.
-    addSphere(group, -.095, 1.96, .236, .025, .018, .018, rubber)
-    addSphere(group, .095, 1.96, .236, .025, .018, .018, rubber)
+    // A shaped neck and jaw give the face a more intentional, character-led silhouette.
+    addSphere(group, 0, 1.72, .015, .16, .2, .16, skin)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(.27, 16, 12), skin)
+    head.position.y = 1.93; head.scale.set(isVolt ? 1 : .94, 1.08, .94); head.castShadow = true; head.userData.hitZone = 'head'; group.add(head)
+    addSphere(group, 0, 1.79, .115, .19, .13, .16, skin)
+    addSphere(group, -.265, 1.94, -.005, .055, .09, .07, skin)
+    addSphere(group, .265, 1.94, -.005, .055, .09, .07, skin)
+    // Face details: brows, eyes, nose and mouth remain readable at mobile camera distance.
+    const eyeWhite = this.material('#f1e9df', .7)
+    const eyeDark = this.material('#25212a', .6)
+    addSphere(group, -.095, 1.97, .244, .047, .026, .022, eyeWhite)
+    addSphere(group, .095, 1.97, .244, .047, .026, .022, eyeWhite)
+    addSphere(group, -.095, 1.97, .264, .018, .021, .012, eyeDark)
+    addSphere(group, .095, 1.97, .264, .018, .021, .012, eyeDark)
+    addBox(group, .105, .035, .035, -.095, 2.025, .245, rubber, -.08)
+    addBox(group, .105, .035, .035, .095, 2.025, .245, rubber, .08)
+    addSphere(group, 0, 1.91, .264, .032, .052, .035, skin)
+    addBox(group, .085, .018, .025, 0, 1.855, .252, this.material('#70483f', .8))
 
     if (isVolt) {
       const hair = this.material('#171b24', .78)
