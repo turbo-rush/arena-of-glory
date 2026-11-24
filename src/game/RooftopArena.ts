@@ -558,6 +558,7 @@ export class RooftopArena {
       fighter.userData.modelMixer = mixer
       fighter.userData.modelActions = actions
       fighter.userData.activeModelAction = ''
+      fighter.userData.modelActionHold = 0
       this.setCharacterAnimation(fighter, 'idle')
     }, undefined, (error) => {
       console.error(`Failed to load ${character} character model; keeping procedural fallback.`, error)
@@ -567,12 +568,20 @@ export class RooftopArena {
   private setCharacterAnimation(fighter: THREE.Group, state: 'idle' | 'run' | 'shoot' | 'reload' | 'hit') {
     const actions = fighter.userData.modelActions as Record<string, THREE.AnimationAction | undefined> | undefined
     if (!actions) return
+    if ((state === 'idle' || state === 'run') && (fighter.userData.modelActionHold as number || 0) > 0) return
     const next = actions[state] || actions.idle
     if (!next || fighter.userData.activeModelAction === state) return
     const previous = actions[fighter.userData.activeModelAction as string]
-    next.reset().fadeIn(.18).play()
-    previous?.fadeOut(.18)
+    next.reset().fadeIn(.14).play()
+    previous?.fadeOut(.14)
     fighter.userData.activeModelAction = state
+  }
+
+  private triggerCharacterAnimation(fighter: THREE.Group, state: 'shoot' | 'reload' | 'hit', holdSeconds: number) {
+    fighter.userData.modelActionHold = holdSeconds
+    // Re-trigger one-shot actions even when two shots happen in quick succession.
+    fighter.userData.activeModelAction = ''
+    this.setCharacterAnimation(fighter, state)
   }
 
   private buildWeaponModel(model: THREE.Group, weapon: WeaponId) {
@@ -701,6 +710,7 @@ export class RooftopArena {
   }
   applyRemoteReload(weapon: WeaponId) {
     if (!this.onlineMode) return
+    this.triggerCharacterAnimation(this.enemy, 'reload', this.reloadDuration)
     if (weapon !== this.remoteWeapon) this.applyRemoteWeaponSwitch(weapon)
     this.remoteReloadTimer = this.reloadDuration
   }
@@ -743,6 +753,7 @@ export class RooftopArena {
   }
   applyOnlineShotResult(hit: boolean, damage: number, targetHealth: number | null, hitZone: 'head' | 'body' | null) {
     if (!this.onlineMode) return
+    if (hit && damage > 0) this.triggerCharacterAnimation(this.enemy, 'hit', .32)
     if (targetHealth !== null) this.enemyHealth = targetHealth
     if (hit && damage > 0) {
       this.hitFeedback = hitZone === 'head' ? 'HEADSHOT' : 'HIT'
@@ -754,6 +765,7 @@ export class RooftopArena {
   }
   applyOnlineDamage(health: number, damage: number, hitZone: 'head' | 'body') {
     if (!this.onlineMode) return
+    this.triggerCharacterAnimation(this.player, 'hit', .32)
     this.health = THREE.MathUtils.clamp(health, 0, 100)
     this.damageFlashId++
     this.hitFeedback = hitZone === 'head' ? 'HEADSHOT' : 'HIT'
@@ -796,6 +808,7 @@ export class RooftopArena {
   }
   applyRemoteFire() {
     if (!this.onlineMode) return
+    this.triggerCharacterAnimation(this.enemy, 'shoot', .38)
     const muzzle = this.enemy.userData.muzzle as THREE.Mesh
     muzzle.visible = true
     this.remoteFireTimer = .2
@@ -884,6 +897,7 @@ export class RooftopArena {
   }
   shoot() {
     if (!this.started || this.reloading || this.ammo <= 0 || this.health <= 0 || this.enemyHealth <= 0) return
+    this.triggerCharacterAnimation(this.player, 'shoot', .38)
     this.ammo--
     if (this.onlineMode) {
       this.recoil = this.weapon === 'sniper' ? 1.5 : this.weapon === 'shotgun' ? 1.25 : this.weapon === 'rifle' ? .72 : .9
@@ -1000,6 +1014,7 @@ export class RooftopArena {
       this.onLocalReload?.()
       return
     }
+    this.triggerCharacterAnimation(this.player, 'reload', this.reloadDuration)
     this.reloading = true
     this.reloadTimer = this.reloadDuration
     const arm = this.player.userData.arm as THREE.Group
@@ -1038,6 +1053,9 @@ export class RooftopArena {
     ;[this.player, this.enemy].forEach(fighter => {
       const mixer = fighter.userData.modelMixer as THREE.AnimationMixer | undefined
       mixer?.update(dt)
+      if (typeof fighter.userData.modelActionHold === 'number' && fighter.userData.modelActionHold > 0) {
+        fighter.userData.modelActionHold = Math.max(0, fighter.userData.modelActionHold - dt)
+      }
     })
     if (this.hitFeedbackTimer > 0) {
       this.hitFeedbackTimer = Math.max(0, this.hitFeedbackTimer - dt)
