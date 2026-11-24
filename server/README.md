@@ -19,3 +19,13 @@ Players connect, exchange `set_ready`, and the server emits `match_started` when
 ## Current scope
 
 The room server supports short-window reconnection: each player receives a rotating resume token, unexpected disconnects reserve the player's slot and server-side state for up to 60 seconds, and the client retries with exponential backoff. A successful resume restores the same player identity, health, weapon and ammunition, then re-sends the current room phase and the opponent's last known position. Explicitly leaving a room releases the slot immediately. This does **not** yet implement reconnect across a full page reload, authoritative movement simulation, full 3D hit validation, cover/line-of-sight collision, full anti-cheat, matchmaking or Telegram identity. Round wins and best-of-five match completion are tracked by the room server. Do not advertise a match as live until the frontend is configured with the deployed Worker URL.
+
+
+## Telegram Mini App setup
+
+1. Open [@BotFather](https://t.me/BotFather) in Telegram and run `/newbot`. Choose a display name and a unique bot username; keep the bot token private.
+2. In BotFather, open **Bot Settings → Configure Mini App** (or **Menu Button**) and configure the Mini App URL as `https://arena-of-glory.vercel.app`. Set the domain to `arena-of-glory.vercel.app` if BotFather requests it.
+3. In the Vercel project, add the environment variable `VITE_TELEGRAM_BOT_USERNAME` with the bot username without the leading `@`, then redeploy the frontend.
+4. Once the Main Mini App is configured, links shared by the game use Telegram deep links in the form `https://t.me/<bot>?startapp=room_<CODE>`. The app reads the Telegram `start_param` and automatically joins that private duel.
+
+The current integration handles Mini App launch, Telegram profile-name prefill, and duel deep links. Server-side verification of Telegram `initData` is a separate security step and must be enabled before treating Telegram profile data as authenticated identity. Never commit the bot token to the repository or expose it as a `VITE_*` variable.
