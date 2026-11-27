@@ -12,6 +12,8 @@ export default function App() {
   const [started, setStarted] = useState(false)
   const [displayName, setDisplayName] = useState('PLAYER')
   const [selectedHero, setSelectedHero] = useState<'VOLT' | 'VEX'>(() => { try { return localStorage.getItem('aog-selected-hero') === 'VEX' ? 'VEX' : 'VOLT' } catch { return 'VOLT' } })
+  const [selectedArena, setSelectedArena] = useState<number>(() => { try { const value = Number(localStorage.getItem('aog-selected-arena') ?? 0); return Number.isInteger(value) && value >= 0 && value <= 2 ? value : 0 } catch { return 0 } })
+  const arenaChoices = ['SKYLINE // GOLDEN HOUR', 'IRONWORKS // DUSK', 'NEON DISTRICT // NIGHT']
   const [inviteLink, setInviteLink] = useState('')
   const [roomCode, setRoomCode] = useState('')
   const [roomPhase, setRoomPhase] = useState<'idle' | 'connecting' | 'waiting' | 'ready' | 'fighting'>('idle')
@@ -158,6 +160,7 @@ export default function App() {
 
   const playSolo = () => {
     leaveRoom()
+    gameRef.current?.selectArena(selectedArena)
     gameRef.current?.start()
     setStarted(true)
   }
@@ -333,6 +336,12 @@ export default function App() {
             <span className="hero-stat"><i>POWER</i><b><u style={{width:"74%"}} /></b></span><span className="hero-stat"><i>SPEED</i><b><u style={{width:"94%"}} /></b></span><span className="hero-stat"><i>CONTROL</i><b><u style={{width:"78%"}} /></b></span>
             <span className="hero-select-state">{selectedHero === "VEX" ? "✓ SELECTED" : "SELECT FIGHTER"}</span>
           </button>
+        </div>
+        <div className="arena-select-heading"><span>02 / SELECT YOUR ARENA</span><i>THREE COMBAT ZONES</i></div>
+        <div className="arena-select-grid">
+          {arenaChoices.map((arena, index) => <button type="button" key={arena} className={"arena-select-card arena-choice-" + index + (selectedArena === index ? " is-selected" : "")} onClick={() => { setSelectedArena(index); try { localStorage.setItem("aog-selected-arena", String(index)) } catch { /* session selection remains active */ } }} aria-pressed={selectedArena === index}>
+            <span className="arena-choice-index">0{index + 1} / COMBAT ZONE</span><b>{arena.split(" // ")[0]}</b><small>{arena.split(" // ")[1]}</small><i>{selectedArena === index ? "✓ SELECTED" : "CHOOSE ARENA"}</i>
+          </button>)}
         </div>
         <label className="lobby-label">PLAYER NAME</label>
         <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />

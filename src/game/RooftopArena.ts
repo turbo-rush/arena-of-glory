@@ -672,6 +672,7 @@ export class RooftopArena {
     this.player = replacement
     this.rebuildWeaponModel()
   }
+  selectArena(index: number) { if (this.started || this.onlineMode || !Number.isInteger(index)) return; this.applyArena(Math.max(0, Math.min(2, index))); this.publish() }
   start() { this.started = true; this.gameStatus = 'FIGHT'; this.publish() }
   startOnline(onLocalInput: (input: DuelInput) => void, onLocalFire: (weapon: WeaponId, aimYaw: number, aimPitch: number) => void, onLocalReload: () => void, onLocalSwitchWeapon: (weapon: WeaponId) => void) {
     this.onlineMode = true

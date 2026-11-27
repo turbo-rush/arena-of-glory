@@ -29,3 +29,7 @@ The room server supports short-window reconnection: each player receives a rotat
 4. Once the Main Mini App is configured, links shared by the game use Telegram deep links in the form `https://t.me/<bot>?startapp=room_<CODE>`. The app reads the Telegram `start_param` and automatically joins that private duel.
 
 The current integration handles Mini App launch, Telegram profile-name prefill, and duel deep links. Server-side verification of Telegram `initData` is a separate security step and must be enabled before treating Telegram profile data as authenticated identity. Never commit the bot token to the repository or expose it as a `VITE_*` variable.
+
+
+## Automatic deployment from GitHub
+A workflow deploys this Worker when files under server/ change. Add repository Actions secrets CLOUDFLARE_API_TOKEN (Workers deployment permissions) and CLOUDFLARE_ACCOUNT_ID. Deployment is skipped if either secret is missing. After deployment, set VITE_DUEL_SERVER_URL in Vercel to the Worker origin and redeploy the frontend. Vercel and Cloudflare are separate deployments.

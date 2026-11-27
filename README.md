@@ -1,34 +1,20 @@
 # ARENA OF GLORY
 
-A stylized third-person rooftop duel prototype built with React, TypeScript, Three.js and Vite.
+Mobile-first 3D rooftop combat game built with React, Three.js and Vite. Visual direction: docs/VISUAL_BIBLE.md.
 
-## Run locally
+## Current game systems
+- VOLT and VEX selectable fighter identities with rigged GLB desktop/mobile assets.
+- Three selectable combat zones: SKYLINE // GOLDEN HOUR, IRONWORKS // DUSK and NEON DISTRICT // NIGHT.
+- Third-person rooftop combat, cover, aiming, crouch/peek, weapon switching, reloads, hit feedback and best-of-five training rounds.
+- Mobile touch controls and desktop keyboard controls.
+- Private two-player room protocol using a Cloudflare Worker and Durable Objects, with room codes, Telegram deep links, ready-up, replicated input, server-side shot/damage/ammo handling and short-window reconnect.
+- Telegram Mini App launch and invite sharing.
 
-```bash
-npm install
-npm run dev
-```
+## Frontend
+Run npm install and npm run build. Deploy the repository root to Vercel. Configure VITE_TELEGRAM_BOT_USERNAME and VITE_DUEL_SERVER_URL (deployed Cloudflare Worker origin).
 
-## Production build
+## Duel server
+See server/README.md. The Worker is separate from Vercel. Add GitHub Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to enable automatic Worker deployments.
 
-```bash
-npm run build
-npm run preview
-```
-
-## Controls
-
-- **W / A / S / D** — move around your rooftop.
-- **Space** — reserved for the dodge mechanic (coming next).
-- **R** — reload.
-- **Aim** — toggle precision mode.
-- **Fire** — shoot the rival on the opposite rooftop.
-- Touch controls are available on mobile screens.
-
-## Deploy to Vercel
-
-Import this repository into Vercel. Framework preset: **Vite**. Build command: `npm run build`. Output directory: `dist`.
-
-## Prototype scope
-
-This first build establishes the 3D rooftop scene, third-person camera, two stylized fighters, basic movement, firing, health and duel result states. Combat and opponent behavior are placeholder prototype logic; online multiplayer, production animations, weapon inventory and Telegram integration are planned for later iterations.
+## Remaining production milestones
+This is the current playable foundation, not a claim that every planned live-service feature is complete. The simplified hit model still needs full 3D cover/line-of-sight validation and authoritative movement; matchmaking, persistent player accounts, ranked seasons, progression/economy, anti-cheat and verified Telegram identity are not shipped. Online rooms require a deployed Worker and VITE_DUEL_SERVER_URL in Vercel.
