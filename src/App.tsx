@@ -64,6 +64,8 @@ export default function App() {
         setRoomPlayers(message.players)
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
       } else if (message.type === 'match_started') {
+        const arenaIndex = ({ 'skyline-golden-hour': 0, 'ironworks-dusk': 1, 'neon-district-night': 2 } as Record<string, number>)[message.arenaId] ?? 0
+        gameRef.current?.selectArena(arenaIndex)
         setRoomPhase('fighting')
         setStarted(true)
         gameRef.current?.startOnline(
@@ -231,7 +233,7 @@ export default function App() {
 
   const setReady = () => {
     try {
-      transportRef.current?.send({ type: 'set_ready', ready: true })
+      transportRef.current?.send({ type: 'set_ready', ready: true, arenaId: ['skyline-golden-hour', 'ironworks-dusk', 'neon-district-night'][selectedArena] })
     } catch (error) {
       setRoomError(error instanceof Error ? error.message : 'Could not set ready')
     }
