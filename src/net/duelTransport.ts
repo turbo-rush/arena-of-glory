@@ -30,7 +30,7 @@ export type ClientDuelMessage =
 export type ServerDuelMessage =
   | { type: 'welcome'; playerId: string; roomCode: string; slot: 1 | 2; resumeToken?: string; resumed?: boolean }
   | { type: 'room_state'; phase: DuelPhase; players: { playerId: string; displayName: string; ready: boolean; connected: boolean }[] }
-  | { type: 'match_started'; arenaId: string; seed: number; serverTime: number; durationSeconds: number; endsAt: number }
+  | { type: 'match_started'; arenaId: string; seed: number; serverTime: number; durationSeconds?: number; endsAt?: number }
   | { type: 'round_started'; roundNumber: number; serverTime: number }
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
@@ -79,7 +79,7 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
       return ['waiting', 'ready', 'fighting', 'round_break', 'finished'].includes(String(value.phase)) && Array.isArray(value.players)
         ? value as ServerDuelMessage : null
     case 'match_started':
-      return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime) && isNumber(value.durationSeconds) && isNumber(value.endsAt)
+      return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime) && (value.durationSeconds === undefined || isNumber(value.durationSeconds)) && (value.endsAt === undefined || isNumber(value.endsAt))
         ? value as ServerDuelMessage : null
     case 'round_started':
       return isNumber(value.roundNumber) && isNumber(value.serverTime) ? value as ServerDuelMessage : null
