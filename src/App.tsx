@@ -233,7 +233,7 @@ export default function App() {
 
   const setReady = () => {
     try {
-      transportRef.current?.send({ type: 'set_ready', ready: true, arenaId: ['skyline-golden-hour', 'ironworks-dusk', 'neon-district-night'][selectedArena] })
+      transportRef.current?.send({ type: 'set_ready', ready: true, arenaId: (['skyline-golden-hour', 'ironworks-dusk', 'neon-district-night'] as const)[selectedArena] })
     } catch (error) {
       setRoomError(error instanceof Error ? error.message : 'Could not set ready')
     }
