@@ -73,6 +73,8 @@ export class DuelRoom {
   private phase: "waiting" | "ready" | "fighting" | "round_break" | "finished" = "waiting"
   private roomCode = ""
   private arenaId = "skyline-golden-hour"
+  private matchEndsAt = 0
+  private matchDurationSeconds = 300
 
   constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
 
@@ -80,6 +82,8 @@ export class DuelRoom {
     this.restorePlayers()
     await this.restorePendingPlayers()
     this.arenaId = await this.state.storage.get<string>("arenaId") ?? this.arenaId
+    this.matchEndsAt = await this.state.storage.get<number>("matchEndsAt") ?? this.matchEndsAt
+    this.matchDurationSeconds = await this.state.storage.get<number>("matchDurationSeconds") ?? this.matchDurationSeconds
     const url = new URL(request.url)
     if (url.pathname === "/internal/create" && request.method === "POST") {
       if (await this.state.storage.get<boolean>("created")) return json({ error: "exists" }, 409)
@@ -154,11 +158,18 @@ export class DuelRoom {
     const attachment = socket.deserializeAttachment() as { playerId?: string } | null
     const player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
     if (!player) return
+    if (this.phase !== "finished" && this.matchEndsAt > 0 && Date.now() >= this.matchEndsAt) {
+      this.finishMatchByScore()
+      return
+    }
 
     switch (message.type) {
       case "set_ready": {
         const wasFighting = this.phase === "fighting"
         if (message.ready === true && ![...this.players.values()].some(candidate => candidate.ready)) {
+          const requestedDuration = Number(message.durationSeconds)
+          this.matchDurationSeconds = requestedDuration === 600 ? 600 : 300
+          await this.state.storage.put("matchDurationSeconds", this.matchDurationSeconds)
           const requestedArena = message.arenaId
           if (requestedArena === "skyline-golden-hour" || requestedArena === "ironworks-dusk" || requestedArena === "neon-district-night") {
             this.arenaId = requestedArena
@@ -171,7 +182,11 @@ export class DuelRoom {
         this.updatePhase()
         this.broadcastRoomState()
         if (!wasFighting && this.phase === "fighting" && this.players.size === 2) {
-          this.broadcast({ type: "match_started", arenaId: this.arenaId, seed: crypto.getRandomValues(new Uint32Array(1))[0], serverTime: Date.now() })
+          const now = Date.now()
+          this.matchEndsAt = now + this.matchDurationSeconds * 1000
+          await this.state.storage.put("matchEndsAt", this.matchEndsAt)
+          await this.state.storage.setAlarm(this.matchEndsAt)
+          this.broadcast({ type: "match_started", arenaId: this.arenaId, seed: crypto.getRandomValues(new Uint32Array(1))[0], serverTime: now, durationSeconds: this.matchDurationSeconds, endsAt: this.matchEndsAt })
         }
         break
       }
@@ -183,7 +198,7 @@ export class DuelRoom {
         if (this.players.size === 2 && [...this.players.values()].every(candidate => candidate.ready)) {
           this.phase = "fighting"
           const roundNumber = [...this.players.values()].reduce((sum, candidate) => sum + candidate.roundWins, 0) + 1
-          this.broadcast({ type: "round_started", roundNumber, serverTime: Date.now() })
+          this.broadcast({ type: "round_started", roundNumber, serverTime: Date.now(), endsAt: this.matchEndsAt })
           this.broadcastRoomState()
         }
         break
@@ -357,7 +372,8 @@ export class DuelRoom {
       const expiresAt = Date.now() + 60_000
       await this.state.storage.put("resume:" + player.resumeToken, { expiresAt, player: { ...attachment, socket: undefined } })
       await this.state.storage.put("roomPhase", this.phase)
-      await this.state.storage.setAlarm(expiresAt)
+      const nextAlarm = this.phase !== "finished" && this.matchEndsAt > Date.now() ? Math.min(expiresAt, this.matchEndsAt) : expiresAt
+      await this.state.storage.setAlarm(nextAlarm)
     }
     this.broadcastRoomState()
   }
@@ -374,8 +390,13 @@ export class DuelRoom {
         }
       }
     }
+    if (this.phase !== "finished" && this.matchEndsAt > 0 && now >= this.matchEndsAt) this.finishMatchByScore()
     if (this.phase !== "finished" && this.players.size < 2) this.phase = this.players.size === 0 ? "waiting" : "ready"
     this.broadcastRoomState()
+    const pending = await this.state.storage.list<{ expiresAt: number }>({ prefix: "resume:" })
+    const pendingExpiry = [...pending.values()].reduce((earliest, item) => Math.min(earliest, item.expiresAt), Number.POSITIVE_INFINITY)
+    const nextAlarm = Math.min(this.phase !== "finished" && this.matchEndsAt > now ? this.matchEndsAt : Number.POSITIVE_INFINITY, pendingExpiry)
+    if (Number.isFinite(nextAlarm)) await this.state.storage.setAlarm(nextAlarm)
   }
 
   private async restorePendingPlayers(): Promise<void> {
@@ -411,7 +432,7 @@ export class DuelRoom {
     const opponent = [...this.players.values()].find(candidate => candidate.id !== player.id)
     const opponentWins = opponent?.roundWins ?? 0
     const opponentHealth = opponent?.health ?? 100
-    socket.send(JSON.stringify({ type: "resume_state", phase: this.phase, health: player.health, opponentHealth, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, roundWins: player.roundWins, opponentWins, lastInputSeq: player.lastInputSeq }))
+    socket.send(JSON.stringify({ type: "resume_state", phase: this.phase, health: player.health, opponentHealth, x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch, roundWins: player.roundWins, opponentWins, lastInputSeq: player.lastInputSeq, matchEndsAt: this.matchEndsAt, durationSeconds: this.matchDurationSeconds }))
     for (const other of this.players.values()) {
       if (other.id !== player.id && other.socket) {
         socket.send(JSON.stringify({ type: "input", input: { seq: other.lastInputSeq, clientTime: Date.now(), moveX: other.x, moveZ: other.z, lookYaw: other.yaw, lookPitch: other.pitch, crouched: false, aiming: false } }))
@@ -467,14 +488,12 @@ export class DuelRoom {
       player1: [...this.players.values()].find(p => p.slot === 1)?.roundWins ?? 0,
       player2: [...this.players.values()].find(p => p.slot === 2)?.roundWins ?? 0,
     }
-    if (winner.roundWins >= 3) {
-      this.phase = "finished"
-      this.broadcast({ type: "match_ended", winnerPlayerId: winner.id, score })
-      this.broadcastRoomState()
+    this.broadcast({ type: "round_ended", roundNumber: score.player1 + score.player2, winnerPlayerId: winner.id, score })
+    if (this.matchEndsAt > 0 && Date.now() >= this.matchEndsAt) {
+      this.finishMatchByScore()
       return
     }
     this.phase = "round_break"
-    this.broadcast({ type: "round_ended", roundNumber: score.player1 + score.player2 + 1, winnerPlayerId: winner.id, score })
     for (const player of this.players.values()) {
       player.ready = false
       player.health = 100
@@ -491,6 +510,22 @@ export class DuelRoom {
       if (player.socket) player.socket.serializeAttachment({ ...(attachment ?? {}), ready: false, health: 100, x: 0, z: 2.3, yaw: Math.PI, pitch: 0, shotTimes: {}, weapon: player.weapon, ammo: player.ammo, reserve: player.reserve, reloadUntil: 0 })
       else await this.persistDisconnectedPlayer(player)
     }
+    this.broadcastRoomState()
+  }
+
+  private finishMatchByScore(): void {
+    if (this.phase === "finished") return
+    const player1 = [...this.players.values()].find(player => player.slot === 1)
+    const player2 = [...this.players.values()].find(player => player.slot === 2)
+    const score1 = player1?.roundWins ?? 0
+    const score2 = player2?.roundWins ?? 0
+    let winnerPlayerId: string | null = null
+    if (score1 > score2) winnerPlayerId = player1?.id ?? null
+    else if (score2 > score1) winnerPlayerId = player2?.id ?? null
+    else if ((player1?.health ?? 0) > (player2?.health ?? 0)) winnerPlayerId = player1?.id ?? null
+    else if ((player2?.health ?? 0) > (player1?.health ?? 0)) winnerPlayerId = player2?.id ?? null
+    this.phase = "finished"
+    this.broadcast({ type: "match_ended", winnerPlayerId, score: { player1: score1, player2: score2 }, reason: "time" })
     this.broadcastRoomState()
   }
 

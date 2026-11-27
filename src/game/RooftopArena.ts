@@ -778,7 +778,7 @@ export class RooftopArena {
     if (Number.isFinite(z)) this.player.position.z = THREE.MathUtils.clamp(z as number, -8.5, 10.2)
     this.roundsWon = Math.max(0, roundsWon)
     this.roundsLost = Math.max(0, roundsLost)
-    this.roundNumber = Math.min(5, this.roundsWon + this.roundsLost + 1)
+    this.roundNumber = Math.max(1, this.roundsWon + this.roundsLost + 1)
     if (phase === 'round_break') {
       this.started = false
       this.gameStatus = 'ROUND_BREAK'
@@ -849,8 +849,6 @@ export class RooftopArena {
   }
   applyOnlineMatchResult(won: boolean) {
     if (!this.onlineMode) return
-    if (won) this.roundsWon++
-    else this.roundsLost++
     this.started = false
     this.gameStatus = won ? 'VICTORY' : 'DEFEAT'
     this.publish()

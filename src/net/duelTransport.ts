@@ -18,7 +18,7 @@ export type DuelInput = {
 export type ClientDuelMessage =
   | { type: 'create_room'; protocol: typeof DUEL_PROTOCOL_VERSION; displayName: string }
   | { type: 'join_room'; protocol: typeof DUEL_PROTOCOL_VERSION; roomCode: string; displayName: string }
-  | { type: 'set_ready'; ready: boolean; arenaId?: 'skyline-golden-hour' | 'ironworks-dusk' | 'neon-district-night' }
+  | { type: 'set_ready'; ready: boolean; durationSeconds?: 300 | 600; arenaId?: 'skyline-golden-hour' | 'ironworks-dusk' | 'neon-district-night' }
   | { type: 'continue_round' }
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
@@ -30,7 +30,7 @@ export type ClientDuelMessage =
 export type ServerDuelMessage =
   | { type: 'welcome'; playerId: string; roomCode: string; slot: 1 | 2; resumeToken?: string; resumed?: boolean }
   | { type: 'room_state'; phase: DuelPhase; players: { playerId: string; displayName: string; ready: boolean; connected: boolean }[] }
-  | { type: 'match_started'; arenaId: string; seed: number; serverTime: number }
+  | { type: 'match_started'; arenaId: string; seed: number; serverTime: number; durationSeconds: number; endsAt: number }
   | { type: 'round_started'; roundNumber: number; serverTime: number }
   | { type: 'input'; input: DuelInput }
   | { type: 'fire'; shotId: number; weapon: WeaponId; aimYaw: number; aimPitch: number }
@@ -42,7 +42,7 @@ export type ServerDuelMessage =
   | { type: 'switch_weapon'; weapon: WeaponId }
   | { type: 'round_ended'; roundNumber: number; winnerPlayerId: string | null; score: { player1: number; player2: number } }
   | { type: 'match_ended'; winnerPlayerId: string | null; score: { player1: number; player2: number } }
-  | { type: 'resume_state'; phase: DuelPhase; health: number; opponentHealth: number; x: number; z: number; yaw: number; pitch: number; roundWins: number; opponentWins: number; lastInputSeq: number }
+  | { type: 'resume_state'; phase: DuelPhase; health: number; opponentHealth: number; x: number; z: number; yaw: number; pitch: number; roundWins: number; opponentWins: number; lastInputSeq: number; matchEndsAt?: number; durationSeconds?: number }
   | { type: 'pong'; clientTime: number; serverTime: number }
   | { type: 'error'; code: string; message: string }
 
@@ -79,7 +79,7 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
       return ['waiting', 'ready', 'fighting', 'round_break', 'finished'].includes(String(value.phase)) && Array.isArray(value.players)
         ? value as ServerDuelMessage : null
     case 'match_started':
-      return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime)
+      return isString(value.arenaId) && isNumber(value.seed) && isNumber(value.serverTime) && isNumber(value.durationSeconds) && isNumber(value.endsAt)
         ? value as ServerDuelMessage : null
     case 'round_started':
       return isNumber(value.roundNumber) && isNumber(value.serverTime) ? value as ServerDuelMessage : null
@@ -118,7 +118,7 @@ export function parseServerDuelMessage(raw: string): ServerDuelMessage | null {
         ? value as ServerDuelMessage : null
     case 'resume_state':
       return ['waiting', 'ready', 'fighting', 'round_break', 'finished'].includes(String(value.phase)) &&
-        isNumber(value.health) && isNumber(value.opponentHealth) && isNumber(value.x) && isNumber(value.z) && isNumber(value.yaw) && isNumber(value.pitch) && isNumber(value.roundWins) && isNumber(value.opponentWins) && isNumber(value.lastInputSeq)
+        isNumber(value.health) && isNumber(value.opponentHealth) && isNumber(value.x) && isNumber(value.z) && isNumber(value.yaw) && isNumber(value.pitch) && isNumber(value.roundWins) && isNumber(value.opponentWins) && isNumber(value.lastInputSeq) && (value.matchEndsAt === undefined || isNumber(value.matchEndsAt)) && (value.durationSeconds === undefined || isNumber(value.durationSeconds))
         ? value as ServerDuelMessage : null
     case 'pong':
       return isNumber(value.clientTime) && isNumber(value.serverTime) ? value as ServerDuelMessage : null

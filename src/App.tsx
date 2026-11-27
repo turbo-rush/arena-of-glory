@@ -20,6 +20,9 @@ export default function App() {
   const [roomPlayers, setRoomPlayers] = useState<{ playerId: string; displayName: string; ready: boolean; connected: boolean }[]>([])
   const [myPlayerId, setMyPlayerId] = useState('')
   const [roomError, setRoomError] = useState('')
+  const [selectedMatchDuration, setSelectedMatchDuration] = useState<300 | 600>(300)
+  const [matchEndsAt, setMatchEndsAt] = useState(0)
+  const [matchSecondsLeft, setMatchSecondsLeft] = useState(0)
   const transportRef = useRef<DuelWebSocketTransport | null>(null)
   const shotSequenceRef = useRef(0)
   const onlineModeRef = useRef(false)
@@ -40,6 +43,14 @@ export default function App() {
   }, [])
 
   useEffect(() => () => transportRef.current?.suspend(), [])
+
+  useEffect(() => {
+    if (!matchEndsAt) { setMatchSecondsLeft(0); return }
+    const update = () => setMatchSecondsLeft(Math.max(0, Math.ceil((matchEndsAt - Date.now()) / 1000)))
+    update()
+    const timer = window.setInterval(update, 250)
+    return () => window.clearInterval(timer)
+  }, [matchEndsAt])
 
   useEffect(() => { gameRef.current?.setPlayerHero(selectedHero) }, [selectedHero])
 
@@ -64,6 +75,7 @@ export default function App() {
         setRoomPlayers(message.players)
         setRoomPhase(message.phase === 'fighting' ? 'fighting' : message.phase === 'ready' || message.phase === 'round_break' || message.phase === 'finished' ? 'ready' : 'waiting')
       } else if (message.type === 'match_started') {
+        setMatchEndsAt(message.endsAt)
         const arenaIndex = ({ 'skyline-golden-hour': 0, 'ironworks-dusk': 1, 'neon-district-night': 2 } as Record<string, number>)[message.arenaId] ?? 0
         gameRef.current?.selectArena(arenaIndex)
         setRoomPhase('fighting')
@@ -80,6 +92,7 @@ export default function App() {
       } else if (message.type === 'fire') {
         gameRef.current?.applyRemoteFire()
       } else if (message.type === 'resume_state') {
+        setMatchEndsAt(message.matchEndsAt ?? 0)
         if (!onlineModeRef.current) {
           gameRef.current?.startOnline(
             input => transport.send({ type: 'input', input }),
@@ -119,6 +132,7 @@ export default function App() {
         setStarted(true)
       } else if (message.type === 'match_ended') {
         gameRef.current?.applyOnlineMatchResult(message.winnerPlayerId === myPlayerId)
+        setMatchEndsAt(0)
         setStarted(false)
       } else if (message.type === 'error') {
         setRoomError(message.message)
@@ -233,7 +247,7 @@ export default function App() {
 
   const setReady = () => {
     try {
-      transportRef.current?.send({ type: 'set_ready', ready: true, arenaId: (['skyline-golden-hour', 'ironworks-dusk', 'neon-district-night'] as const)[selectedArena] })
+      transportRef.current?.send({ type: 'set_ready', ready: true, durationSeconds: selectedMatchDuration, arenaId: (['skyline-golden-hour', 'ironworks-dusk', 'neon-district-night'] as const)[selectedArena] })
     } catch (error) {
       setRoomError(error instanceof Error ? error.message : 'Could not set ready')
     }
@@ -250,6 +264,7 @@ export default function App() {
     setRoomPlayers([])
     setMyPlayerId('')
     setRoomPhase('idle')
+    setMatchEndsAt(0)
     setRoomError('')
   }
 
@@ -277,6 +292,7 @@ export default function App() {
   const fire = () => gameRef.current?.shoot()
   const reload = () => gameRef.current?.reload()
   const move = (key: string, pressed: boolean) => gameRef.current?.setTouchKey(key, pressed)
+  const timerLabel = `${Math.floor(matchSecondsLeft / 60).toString().padStart(2, '0')}:${(matchSecondsLeft % 60).toString().padStart(2, '0')}`
 
   return (
     <main className="game-shell">
@@ -286,7 +302,7 @@ export default function App() {
       <div className="vignette" />
       <header className="topbar">
         <div className="brand"><span className="brand-mark">A</span><div><b>ARENA <i>OF</i> GLORY</b><small>ROOFTOP COMBAT // SECTOR 07</small></div></div>
-        <div className="match-tag"><span className="live-dot" /> ROUND {state.roundNumber}/5 <strong>{state.roundsWon} : {state.roundsLost}</strong></div>
+        <div className="match-tag"><span className="live-dot" /> {roomPhase === 'fighting' ? timerLabel : `${selectedMatchDuration / 60}:00 MATCH`} <strong>{state.roundsWon} : {state.roundsLost}</strong></div>
       </header>
 
       <section className="hud">
@@ -303,7 +319,7 @@ export default function App() {
         </div>
       </section>
 
-      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>{state.arenaName}</b><small>{roomPhase === 'fighting' ? 'LIVE ONLINE DUEL' : 'FIRST TO 3 WINS THE MATCH'}</small></div></div>
+      <div className="objective"><span className="objective-icon"><Crosshair size={15}/></span><div><b>{state.arenaName}</b><small>{roomPhase === 'fighting' ? 'LIVE ONLINE DUEL // MATCH CLOCK' : 'ROUND WINS // MATCH CLOCK'}</small></div></div>
 
       <div className="weapon-panel">
         <div className="weapon-icon"><span>✦</span><small>LOADOUT</small></div>
@@ -345,6 +361,12 @@ export default function App() {
             <span className="arena-choice-index">0{index + 1} / COMBAT ZONE</span><b>{arena.split(" // ")[0]}</b><small>{arena.split(" // ")[1]}</small><i>{selectedArena === index ? "✓ SELECTED" : "CHOOSE ARENA"}</i>
           </button>)}
         </div>
+        <div className="lobby-label">MATCH LENGTH</div>
+        <div className="arena-select-grid" style={{ marginBottom: 16 }}>
+          {[300, 600].map(seconds => <button type="button" key={seconds} className={`arena-select-card${selectedMatchDuration === seconds ? ' is-selected' : ''}`} onClick={() => setSelectedMatchDuration(seconds as 300 | 600)} aria-pressed={selectedMatchDuration === seconds}>
+            <span className="arena-choice-index">{seconds === 300 ? 'QUICK MATCH' : 'FULL MATCH'}</span><b>{seconds / 60} MIN</b><small>{seconds === 300 ? 'FAST ROOFTOP DUEL' : 'LONG-FORM DUEL'}</small><i>{selectedMatchDuration === seconds ? '✓ SELECTED' : 'CHOOSE LENGTH'}</i>
+          </button>)}
+        </div>
         <label className="lobby-label">PLAYER NAME</label>
         <input className="lobby-input" value={displayName} maxLength={20} onChange={event => setDisplayName(event.target.value)} placeholder="Your name" />
         {roomPhase === 'idle' && <>
@@ -360,7 +382,7 @@ export default function App() {
             return <div className="room-player" key={index}><span className="player-slot">{index + 1}</span><div><b>{player?.displayName ?? (index === 0 ? 'WAITING FOR YOU' : 'WAITING FOR OPPONENT')}</b><small>{player ? (player.ready ? 'READY' : 'CONNECTED') : 'NOT CONNECTED'}</small></div><i className={player?.ready ? 'player-ready' : ''}>{player?.ready ? '✓' : '—'}</i></div>
           })}</div>
           {roomPhase !== 'fighting' && roomPhase !== 'connecting' && !roomPlayers.some(player => player.playerId === myPlayerId && player.ready) && <button className="lobby-primary" onClick={setReady}>I'M READY <span>→</span></button>}
-          <p className="lobby-note">Player movement and firing animations are relayed live. Server-validated hits, damage and match scoring are the next stage.</p>
+          <p className="lobby-note">Live player movement, manual aim, server-validated hits and a synchronized match clock.</p>
           <button className="lobby-secondary" onClick={leaveRoom}>LEAVE ROOM</button>
         </div>}
         {roomError && <div className="lobby-error">{roomError}</div>}
