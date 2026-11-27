@@ -195,8 +195,8 @@ export class DuelRoom {
         const state = input as Record<string, unknown>
         const valid = Number.isSafeInteger(state.seq) && Number(state.seq) > player.lastInputSeq &&
           Number.isFinite(state.clientTime) &&
-          Number.isFinite(state.moveX) && Number(state.moveX) >= -6.8 && Number(state.moveX) <= 6.8 &&
-          Number.isFinite(state.moveZ) && Number(state.moveZ) >= -1.8 && Number(state.moveZ) <= 6.5 &&
+          Number.isFinite(state.moveX) && Number(state.moveX) >= -10.2 && Number(state.moveX) <= 10.2 &&
+          Number.isFinite(state.moveZ) && Number(state.moveZ) >= -8.5 && Number(state.moveZ) <= 10.2 &&
           Number.isFinite(state.lookYaw) && Math.abs(Number(state.lookYaw)) <= Math.PI * 4 &&
           Number.isFinite(state.lookPitch) && Math.abs(Number(state.lookPitch)) <= Math.PI / 2 &&
           typeof state.crouched === "boolean" && typeof state.aiming === "boolean"
@@ -258,15 +258,15 @@ export class DuelRoom {
         let damage = 0
         let hitZone: "head" | "body" | null = null
         if (target && target.health > 0) {
-          const shooterZ = player.slot === 1 ? 5 + player.z : -12.5 - player.z
-          const targetZ = player.slot === 1 ? -12.5 - target.z : 5 + target.z
+          const shooterZ = player.slot === 1 ? 7 + player.z : -20 - player.z
+          const targetZ = player.slot === 1 ? -20 - target.z : 7 + target.z
           const dx = target.x - player.x
           const dz = targetZ - shooterZ
           const directionX = Math.sin(aimYaw as number)
           const directionZ = Math.cos(aimYaw as number) * (player.slot === 1 ? 1 : -1)
           const along = dx * directionX + dz * directionZ
           const perpendicular = Math.abs(dx * directionZ - dz * directionX)
-          const range = typedWeapon === "sniper" ? 70 : typedWeapon === "rifle" ? 45 : typedWeapon === "shotgun" ? 16 : 32
+          const range = typedWeapon === "sniper" ? 90 : typedWeapon === "rifle" ? 65 : typedWeapon === "shotgun" ? 22 : 48
           const pitchError = Math.abs(aimPitch as number)
           if (along > 0 && along <= range && perpendicular < (typedWeapon === "shotgun" ? 1.15 : .72) && pitchError < .42) {
             hitZone = (aimPitch as number) > .025 ? "head" : "body"
@@ -479,7 +479,7 @@ export class DuelRoom {
       player.ready = false
       player.health = 100
       player.x = 0
-      player.z = 2.3
+      player.z = 5.3
       player.yaw = Math.PI
       player.pitch = 0
       player.shotTimes = {}

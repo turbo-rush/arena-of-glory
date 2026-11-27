@@ -313,7 +313,7 @@ export default function App() {
         <button className="weapon-switch" onClick={() => gameRef.current?.switchWeapon()} aria-label="Сменить оружие">SWAP</button>
       </div>
 
-      <div className="controls-hint"><span>W A S D</span> MOVE <span>C</span> CROUCH <span>Q / E</span> PEEK</div>
+      <div className="controls-hint"><span>W A S D</span> MOVE <span>DRAG</span> AIM <span>C</span> CROUCH <span>Q / E</span> PEEK</div>
       <div className="touch-controls">
         <div className="dpad">
           <button onTouchStart={() => move('KeyW', true)} onTouchEnd={() => move('KeyW', false)} onMouseDown={() => move('KeyW', true)} onMouseUp={() => move('KeyW', false)}>▲</button>

@@ -65,6 +65,11 @@ export class RooftopArena {
   private started = false
   private disposed = false
   private aiming = false
+  private lookYaw = Math.PI
+  private lookPitch = -.12
+  private pointerLooking = false
+  private lastPointerX = 0
+  private lastPointerY = 0
   private walkTime = 0
   private enemyWalkTime = 0
   private recoil = 0
@@ -102,14 +107,16 @@ export class RooftopArena {
   private hemisphere!: THREE.HemisphereLight
   private arenaLandmarks: THREE.Group[] = []
   private readonly coverColliders = [
-    new THREE.Box3(new THREE.Vector3(-7.0, 0, .95), new THREE.Vector3(-4.2, 1.55, 2.05)),
-    new THREE.Box3(new THREE.Vector3(4.0, 0, 6.2), new THREE.Vector3(6.4, 1.35, 7.4)),
-    new THREE.Box3(new THREE.Vector3(-5.75, 0, -11.1), new THREE.Vector3(-3.25, 1.65, -9.9)),
-    new THREE.Box3(new THREE.Vector3(2.95, 0, -14.9), new THREE.Vector3(5.45, 1.45, -13.7))
+    new THREE.Box3(new THREE.Vector3(-8.1, 0, 2.5), new THREE.Vector3(-5.2, 1.85, 4.4)),
+    new THREE.Box3(new THREE.Vector3(4.2, 0, 8.2), new THREE.Vector3(7.1, 1.55, 10.1)),
+    new THREE.Box3(new THREE.Vector3(-7.2, 0, -19.5), new THREE.Vector3(-4.3, 1.9, -17.5)),
+    new THREE.Box3(new THREE.Vector3(4.3, 0, -24.5), new THREE.Vector3(7.2, 1.7, -22.5))
   ]
   private readonly coverZones = [
-    { x: -5.6, z: -3.5, halfX: 1.4, halfZ: .55 },
-    { x: 5.2, z: 1.8, halfX: 1.2, halfZ: .6 }
+    { x: -6.65, z: -3.5, halfX: 1.45, halfZ: .9 },
+    { x: 5.65, z: 1.8, halfX: 1.45, halfZ: .9 },
+    { x: -5.8, z: 7.0, halfX: 1.3, halfZ: .85 },
+    { x: 6.1, z: -1.2, halfX: 1.35, halfZ: .8 }
   ]
   private muzzleTimer = 0
   private tracer: THREE.Line | null = null
@@ -118,6 +125,16 @@ export class RooftopArena {
   private host: HTMLElement
   private onKeyDown = (e: KeyboardEvent) => { this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); if (e.code === 'KeyR') this.reload(); if (e.code === 'KeyC' && !e.repeat) this.crouch() }
   private onKeyUp = (e: KeyboardEvent) => { this.keys.delete(e.code); if (e.code === 'KeyQ' || e.code === 'KeyE') this.peekDirection = 0 }
+  private onPointerDown = (event: PointerEvent) => { this.pointerLooking = true; this.lastPointerX = event.clientX; this.lastPointerY = event.clientY }
+  private onPointerMove = (event: PointerEvent) => {
+    if (!this.pointerLooking || !this.started) return
+    const dx = event.clientX - this.lastPointerX
+    const dy = event.clientY - this.lastPointerY
+    this.lastPointerX = event.clientX; this.lastPointerY = event.clientY
+    this.lookYaw -= dx * .0042
+    this.lookPitch = THREE.MathUtils.clamp(this.lookPitch - dy * .0032, -.62, .48)
+  }
+  private onPointerUp = () => { this.pointerLooking = false }
   private resizeObserver: ResizeObserver
 
   constructor(host: HTMLElement, listener: StateListener) {
@@ -131,6 +148,10 @@ export class RooftopArena {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.25
     host.appendChild(this.renderer.domElement)
+    this.renderer.domElement.style.touchAction = 'none'
+    this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown)
+    window.addEventListener('pointermove', this.onPointerMove)
+    window.addEventListener('pointerup', this.onPointerUp)
     this.scene.background = new THREE.Color('#9b9b9d')
     this.scene.fog = new THREE.Fog('#9b9b9d', 35, 115)
     this.buildWorld()
@@ -183,33 +204,59 @@ export class RooftopArena {
     neonSign2.position.set(-18, 6.8, -44.7); neonProps.add(neonSign2)
     this.arenaLandmarks.forEach((group, index) => { group.visible = index === 0 })
 
-    // Player rooftop
-    const roof = new THREE.Group(); this.roof = roof; roof.position.set(0, 0, 5); this.scene.add(roof)
-    this.box(roof, 0, -0.45, 0, 17, .9, 15, '#353b46')
-    this.box(roof, 0, .04, -7.2, 17, 1.2, .5, '#555a64')
-    this.box(roof, -8.2, .04, 0, .5, 1.2, 15, '#555a64')
-    this.box(roof, 8.2, .04, 0, .5, 1.2, 15, '#555a64')
-    for (let i = 0; i < 5; i++) this.box(roof, -6 + i * 3, .12, 5.5, 1.2, .25, 1.2, '#737781')
-    this.box(roof, -5.6, .75, -3.5, 2.8, 1.5, 1.1, '#59636e')
-    this.box(roof, 5.2, .65, 1.8, 2.4, 1.3, 1.2, '#59636e')
-    this.addRoofGraphics(roof, 17, 15, '#ff8b45')
-    // Enemy rooftop
-    const far = new THREE.Group(); this.farRoof = far; far.position.set(0, 0, -12.5); this.scene.add(far)
-    this.box(far, 0, -0.45, 0, 15, .9, 12, '#383d49')
-    this.box(far, -7.2, .1, 0, .5, 1.3, 12, '#656a72')
-    this.box(far, 7.2, .1, 0, .5, 1.3, 12, '#656a72')
-    this.box(far, 0, .1, -5.8, 15, 1.3, .5, '#656a72')
-    this.box(far, -4.5, .8, 2, 2.5, 1.6, 1.2, '#59636e')
-    this.box(far, 4.2, .7, -1.8, 2.5, 1.4, 1.2, '#59636e')
-    this.addRoofGraphics(far, 15, 12, '#ffbd70')
+    // Two expanded rooftop platforms with a long exposed gap between them.
+    const roof = new THREE.Group(); this.roof = roof; roof.position.set(0, 0, 7); this.scene.add(roof)
+    this.box(roof, 0, -.45, 0, 24, .9, 22, '#353b46')
+    this.box(roof, 0, .04, -10.7, 24, 1.2, .5, '#555a64')
+    this.box(roof, -11.7, .04, 0, .5, 1.2, 22, '#555a64')
+    this.box(roof, 11.7, .04, 0, .5, 1.2, 22, '#555a64')
+    for (let i = 0; i < 7; i++) this.box(roof, -9 + i * 3, .12, 8.7, 1.25, .25, 1.25, '#737781')
+    this.addRoofGraphics(roof, 24, 22, '#ff8b45')
+    const addEquipment = (parent: THREE.Group, x: number, z: number, accent: string) => {
+      const unit = new THREE.Group(); unit.position.set(x, 0, z); parent.add(unit)
+      this.box(unit, 0, .72, 0, 3.1, 1.35, 2.1, '#59636e')
+      this.box(unit, 0, 1.43, 0, 2.55, .12, 1.7, '#303944')
+      for (let fan = -1; fan <= 1; fan += 2) {
+        const grille = new THREE.Mesh(new THREE.CylinderGeometry(.48, .48, .08, 18), this.material('#242c36'))
+        grille.position.set(fan * .72, 1.52, 0); unit.add(grille)
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .1, 12), this.material(accent))
+        hub.position.set(fan * .72, 1.58, 0); unit.add(hub)
+        for (let blade = 0; blade < 4; blade++) {
+          const fin = this.box(unit, fan * .72, 1.59, 0, .08, .035, .72, this.material('#8c99a5'))
+          fin.rotation.y = blade * Math.PI / 2
+        }
+      }
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, 1.8, 12), this.material('#7d858d'))
+      pipe.position.set(1.45, .9, -.7); unit.add(pipe)
+      const pipeCap = new THREE.Mesh(new THREE.CylinderGeometry(.32, .32, .12, 12), this.material(accent))
+      pipeCap.position.set(1.45, 1.82, -.7); unit.add(pipeCap)
+    }
+    addEquipment(roof, -7.1, -3.5, '#ff8b45')
+    addEquipment(roof, 6.1, 6.8, '#ffbd70')
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(.72, .72, 1.25, 16), this.material('#47515d'))
+    drum.position.set(-5.8, .63, 7.1); roof.add(drum)
+    const dish = new THREE.Mesh(new THREE.SphereGeometry(1.15, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.material('#9aa2aa'))
+    dish.position.set(7.4, 1.2, -5.4); dish.rotation.x = Math.PI; roof.add(dish)
+    const far = new THREE.Group(); this.farRoof = far; far.position.set(0, 0, -20); this.scene.add(far)
+    this.box(far, 0, -.45, 0, 22, .9, 20, '#383d49')
+    this.box(far, -10.7, .1, 0, .5, 1.3, 20, '#656a72')
+    this.box(far, 10.7, .1, 0, .5, 1.3, 20, '#656a72')
+    this.box(far, 0, .1, -9.7, 22, 1.3, .5, '#656a72')
+    addEquipment(far, -6.0, 2.2, '#ffbd70')
+    addEquipment(far, 6.0, -5.2, '#ff8b45')
+    const farTank = new THREE.Mesh(new THREE.CylinderGeometry(.9, .9, 1.8, 18), this.material('#555d68'))
+    farTank.position.set(0, .9, 5.8); far.add(farTank)
+    const farDish = new THREE.Mesh(new THREE.SphereGeometry(1.2, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.material('#8b96a5'))
+    farDish.position.set(7.2, 1.4, 4.8); farDish.rotation.x = Math.PI; far.add(farDish)
+    this.addRoofGraphics(far, 22, 20, '#ffbd70')
     this.player = this.createFighter('volt')
-    this.player.position.set(0, 0, 2.3); this.player.scale.setScalar(0.78); roof.add(this.player)
+    this.player.position.set(0, 0, 5.3); this.player.scale.setScalar(.78); roof.add(this.player)
     this.enemy = this.createFighter('vex')
-    this.enemy.position.set(-1.4, 0, 0.8); this.enemy.scale.setScalar(0.78); far.add(this.enemy)
+    this.enemy.position.set(-1.4, 0, 5.0); this.enemy.scale.setScalar(.78); far.add(this.enemy)
     this.rebuildWeaponModel()
-    // Camera follows just behind the player, looking toward the rival rooftop.
-    this.camera.position.set(0, 7.4, 20.2)
-    this.camera.lookAt(0, 1.3, -9.4)
+    this.camera.position.set(0, 7.4, 22.2)
+    this.camera.lookAt(0, 1.3, -13)
+    this.lookYaw = Math.PI; this.lookPitch = -.12
     this.applyArena(0)
   }
 
@@ -700,8 +747,8 @@ export class RooftopArena {
   }
   applyRemoteInput(input: DuelInput) {
     if (!this.onlineMode) return
-    this.remoteTarget.x = THREE.MathUtils.clamp(input.moveX, -6.8, 6.8)
-    this.remoteTarget.z = THREE.MathUtils.clamp(input.moveZ, -1.8, 6.5)
+    this.remoteTarget.x = THREE.MathUtils.clamp(input.moveX, -10.2, 10.2)
+    this.remoteTarget.z = THREE.MathUtils.clamp(input.moveZ, -8.5, 10.2)
     this.remoteCrouched = input.crouched
     this.remoteAiming = input.aiming
     this.remoteLookPitch = THREE.MathUtils.clamp(input.lookPitch, -Math.PI / 2, Math.PI / 2)
@@ -727,8 +774,8 @@ export class RooftopArena {
     this.health = THREE.MathUtils.clamp(health, 0, 100)
     if (Number.isFinite(opponentHealth)) this.enemyHealth = THREE.MathUtils.clamp(opponentHealth as number, 0, 100)
     if (Number.isFinite(lastInputSeq)) this.inputSequence = Math.max(0, Math.floor(lastInputSeq as number))
-    if (Number.isFinite(x)) this.player.position.x = THREE.MathUtils.clamp(x as number, -6.8, 6.8)
-    if (Number.isFinite(z)) this.player.position.z = THREE.MathUtils.clamp(z as number, -1.8, 6.5)
+    if (Number.isFinite(x)) this.player.position.x = THREE.MathUtils.clamp(x as number, -10.2, 10.2)
+    if (Number.isFinite(z)) this.player.position.z = THREE.MathUtils.clamp(z as number, -8.5, 10.2)
     this.roundsWon = Math.max(0, roundsWon)
     this.roundsLost = Math.max(0, roundsLost)
     this.roundNumber = Math.min(5, this.roundsWon + this.roundsLost + 1)
@@ -858,9 +905,9 @@ export class RooftopArena {
     this.enemyDodgeTimer = 0; this.enemyDodgeDirection = 1
     this.playerAimTimer = 0; this.enemyAimBreakTimer = 0; this.enemyAimBreakCooldown = 0; this.enemyAimBreakDirection = 1
     this.playerCampTimer = 0; this.enemyFlankTimer = 0; this.enemyFlankCooldown = 0
-    this.previousPlayerPosition.set(0, 0, 2.3); this.playerVelocity.set(0, 0, 0)
+    this.previousPlayerPosition.set(0, 0, 5.3); this.playerVelocity.set(0, 0, 0)
     this.enemyCovering = false; this.enemyPeeking = false; this.enemyHitTimer = 0
-    this.recoil = 0; this.player.position.set(0, 0, 2.3); this.enemy.position.set(1.4, 0, -1.7)
+    this.recoil = 0; this.player.position.set(0, 0, 5.3); this.enemy.position.set(1.4, 0, 5.0)
     this.player.rotation.set(0, Math.PI, 0); this.enemy.rotation.set(0, Math.PI, 0)
     this.player.userData.arm.rotation.x = 0; this.enemy.userData.arm.rotation.x = 0
     this.keys.clear(); this.touchKeys.clear(); this.rebuildWeaponModel()
@@ -1112,7 +1159,7 @@ export class RooftopArena {
           this.publish()
         }
       }
-      const speed = 4.4 * dt
+      const speed = (this.aiming ? 3.05 : 4.1) * dt
       const forward = this.keys.has('KeyW') || this.touchKeys.has('KeyW')
       const back = this.keys.has('KeyS') || this.touchKeys.has('KeyS')
       const left = this.keys.has('KeyA') || this.touchKeys.has('KeyA')
@@ -1126,9 +1173,9 @@ export class RooftopArena {
       if (!this.blockedByCover(nextX, this.player.position.z)) this.player.position.x = nextX
       if (!this.blockedByCover(this.player.position.x, nextZ)) this.player.position.z = nextZ
       if (moving) this.walkTime += dt * 10
-      this.player.position.x = THREE.MathUtils.clamp(this.player.position.x, -6.8, 6.8)
-      this.player.position.z = THREE.MathUtils.clamp(this.player.position.z, -1.8, 6.5)
-      this.player.rotation.y = Math.PI
+      this.player.position.x = THREE.MathUtils.clamp(this.player.position.x, -10.2, 10.2)
+      this.player.position.z = THREE.MathUtils.clamp(this.player.position.z, -8.5, 10.2)
+      this.player.rotation.y = this.lookYaw
       const playerLegs = this.player.userData.legs as THREE.Mesh[]
       playerLegs.forEach((leg, index) => { const walk = moving ? Math.sin(this.walkTime + index * Math.PI) * .62 : 0; leg.rotation.x = THREE.MathUtils.damp(leg.rotation.x, this.crouched ? -.85 + walk * .25 : walk, 10, dt) })
       const playerTorso = this.player.userData.torso as THREE.Mesh
@@ -1328,16 +1375,20 @@ export class RooftopArena {
       }
     }
     this.camera.position.x += (this.player.position.x * .2 - this.camera.position.x) * .055
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 6.6 : 7.4, 5, dt)
-    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 18.4 : 20.2, 5, dt)
-    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 48 : 56, 6, dt)
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.aiming ? 6.25 : 7.4, 5, dt)
+    this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.aiming ? 20.1 : 22.2, 5, dt)
+    this.camera.fov = THREE.MathUtils.damp(this.camera.fov, this.aiming ? 43 : 56, 6, dt)
     this.camera.updateProjectionMatrix()
-    this.camera.lookAt(this.player.position.x * .12 + this.peekDirection * .28, this.crouched ? .95 : 1.3, -9.4)
+    const aimDistance = 34
+    const aimDirection = new THREE.Vector3(Math.sin(this.lookYaw) * Math.cos(this.lookPitch), Math.sin(this.lookPitch), Math.cos(this.lookYaw) * Math.cos(this.lookPitch))
+    this.camera.lookAt(this.camera.position.clone().addScaledVector(aimDirection, aimDistance))
     this.renderer.render(this.scene, this.camera)
   }
   destroy() {
     this.disposed = true; cancelAnimationFrame(this.frame); this.resizeObserver.disconnect()
     window.removeEventListener('keydown', this.onKeyDown); window.removeEventListener('keyup', this.onKeyUp)
+    this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown)
+    window.removeEventListener('pointermove', this.onPointerMove); window.removeEventListener('pointerup', this.onPointerUp)
     if (this.tracer) { this.scene.remove(this.tracer); this.tracer.geometry.dispose(); (this.tracer.material as THREE.Material).dispose() }
     this.impactParticles.forEach(p => { this.scene.remove(p.mesh); p.mesh.geometry.dispose(); (p.mesh.material as THREE.Material).dispose() }); this.impactParticles = []
     this.renderer.dispose(); this.host.removeChild(this.renderer.domElement)
