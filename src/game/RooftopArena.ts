@@ -222,7 +222,7 @@ export class RooftopArena {
         const hub = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .1, 12), this.material(accent))
         hub.position.set(fan * .72, 1.58, 0); unit.add(hub)
         for (let blade = 0; blade < 4; blade++) {
-          const fin = this.box(unit, fan * .72, 1.59, 0, .08, .035, .72, this.material('#8c99a5'))
+          const fin = this.box(unit, fan * .72, 1.59, 0, .08, .035, .72, '#8c99a5')
           fin.rotation.y = blade * Math.PI / 2
         }
       }
