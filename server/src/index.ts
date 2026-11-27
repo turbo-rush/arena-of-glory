@@ -72,12 +72,14 @@ export class DuelRoom {
   private players = new Map<string, Player>()
   private phase: "waiting" | "ready" | "fighting" | "round_break" | "finished" = "waiting"
   private roomCode = ""
+  private arenaId = "skyline-golden-hour"
 
   constructor(private readonly state: DurableObjectState, private readonly env: Env) {}
 
   async fetch(request: Request): Promise<Response> {
     this.restorePlayers()
     await this.restorePendingPlayers()
+    this.arenaId = await this.state.storage.get<string>("arenaId") ?? this.arenaId
     const url = new URL(request.url)
     if (url.pathname === "/internal/create" && request.method === "POST") {
       if (await this.state.storage.get<boolean>("created")) return json({ error: "exists" }, 409)
@@ -156,13 +158,20 @@ export class DuelRoom {
     switch (message.type) {
       case "set_ready": {
         const wasFighting = this.phase === "fighting"
+        if (message.ready === true && ![...this.players.values()].some(candidate => candidate.ready)) {
+          const requestedArena = message.arenaId
+          if (requestedArena === "skyline-golden-hour" || requestedArena === "ironworks-dusk" || requestedArena === "neon-district-night") {
+            this.arenaId = requestedArena
+            await this.state.storage.put("arenaId", this.arenaId)
+          }
+        }
         player.ready = message.ready === true
         const attachment = socket.deserializeAttachment() as { playerId: string; name: string; slot: 1 | 2 }
         socket.serializeAttachment({ ...attachment, ready: player.ready })
         this.updatePhase()
         this.broadcastRoomState()
         if (!wasFighting && this.phase === "fighting" && this.players.size === 2) {
-          this.broadcast({ type: "match_started", arenaId: "skyline-golden-hour", seed: crypto.getRandomValues(new Uint32Array(1))[0], serverTime: Date.now() })
+          this.broadcast({ type: "match_started", arenaId: this.arenaId, seed: crypto.getRandomValues(new Uint32Array(1))[0], serverTime: Date.now() })
         }
         break
       }
