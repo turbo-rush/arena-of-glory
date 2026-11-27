@@ -302,7 +302,7 @@ export default function App() {
       <div className="vignette" />
       <header className="topbar">
         <div className="brand"><span className="brand-mark">A</span><div><b>ARENA <i>OF</i> GLORY</b><small>ROOFTOP COMBAT // SECTOR 07</small></div></div>
-        <div className="match-tag"><span className="live-dot" /> {roomPhase === 'fighting' ? timerLabel : `${selectedMatchDuration / 60}:00 MATCH`} <strong>{state.roundsWon} : {state.roundsLost}</strong></div>
+        <div className="match-tag"><span className="live-dot" /> {matchEndsAt > 0 ? timerLabel : `${selectedMatchDuration / 60}:00 MATCH`} <strong>{state.roundsWon} : {state.roundsLost}</strong></div>
       </header>
 
       <section className="hud">

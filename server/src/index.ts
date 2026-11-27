@@ -119,7 +119,9 @@ export class DuelRoom {
         this.players.set(player.id, player)
         this.phase = await this.state.storage.get<typeof this.phase>("roomPhase") ?? this.phase
         server.serializeAttachment({ ...resumed, resumeToken })
-        await this.state.storage.setAlarm(Date.now() + 60_000)
+        const resumeExpiry = Date.now() + 60_000
+        const nextAlarm = this.matchEndsAt > Date.now() ? Math.min(resumeExpiry, this.matchEndsAt) : resumeExpiry
+        await this.state.storage.setAlarm(nextAlarm)
         server.send(JSON.stringify({ type: "welcome", playerId: player.id, roomCode: this.roomCode, slot: player.slot, resumeToken, resumed: true }))
         this.sendResumeState(server, player)
       } else {
@@ -144,6 +146,8 @@ export class DuelRoom {
   async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     this.restorePlayers()
     await this.restorePendingPlayers()
+    this.matchEndsAt = await this.state.storage.get<number>("matchEndsAt") ?? this.matchEndsAt
+    this.matchDurationSeconds = await this.state.storage.get<number>("matchDurationSeconds") ?? this.matchDurationSeconds
     if (typeof raw !== "string" || raw.length > 16_384) {
       socket.close(1009, "message_too_large")
       return
@@ -337,6 +341,8 @@ export class DuelRoom {
   async webSocketClose(socket: WebSocket, code: number, reason: string): Promise<void> {
     this.restorePlayers()
     await this.restorePendingPlayers()
+    this.matchEndsAt = await this.state.storage.get<number>("matchEndsAt") ?? this.matchEndsAt
+    this.matchDurationSeconds = await this.state.storage.get<number>("matchDurationSeconds") ?? this.matchDurationSeconds
     const attachment = socket.deserializeAttachment() as Record<string, any> | null
     let player = attachment?.playerId ? this.players.get(attachment.playerId) : undefined
     if (!player && attachment?.playerId) {
@@ -380,6 +386,8 @@ export class DuelRoom {
 
   async alarm(): Promise<void> {
     await this.restorePendingPlayers()
+    this.matchEndsAt = await this.state.storage.get<number>("matchEndsAt") ?? this.matchEndsAt
+    this.matchDurationSeconds = await this.state.storage.get<number>("matchDurationSeconds") ?? this.matchDurationSeconds
     const now = Date.now()
     for (const [id, player] of this.players) {
       if (!player.socket) {
